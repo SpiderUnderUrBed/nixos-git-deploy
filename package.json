@@ -1,0 +1,15 @@
+{
+  "name": "nixos-git-deploy",
+  "version": "1.0.0",
+  "description": "Manages your nixos configuration and remote repos",
+  "main": "index.js",
+  "scripts": {
+    "run": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "inquirer": "^9.2.1"
+  },
+  "author": "SpiderUnderUrBed",
+  "license": "GPL-3.0-or-later"
+}
