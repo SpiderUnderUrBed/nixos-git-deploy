@@ -1,0 +1,69 @@
+import inquirer, { Answers } from "inquirer";
+import * as fs from "fs";
+import simpleGit, { SimpleGit } from 'simple-git';
+
+interface LocationOptions {
+    options: string[];
+    layer: number;
+}
+
+let git: SimpleGit | null = null;
+
+function recurse(location: LocationOptions): void {
+    inquirer
+        .prompt<Answers>([
+            {
+                type: 'list',
+                name: 'entrypoint',
+                message: 'What do you want to do?',
+                choices: location.options,
+            },
+        ])
+        .then((answers: Answers) => {
+            if (answers.entrypoint == "init") {
+                try {
+                    if (!fs.existsSync("/home/spiderunderurbed/.config/nixos-git-deploy")) {
+                        fs.mkdirSync("/home/spiderunderurbed/.config/nixos-git-deploy");
+                        git = simpleGit('/home/spiderunderurbed/.config/nixos-git-deploy');
+                        git.init();
+                        git.addRemote('origin', '');
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            } else if (answers.entrypoint == "apply") {
+                // Add your logic for "apply" here
+            } else if (answers.entrypoint == "remove") {
+                // Add your logic for "remove" here
+            } else if (answers.entrypoint == "upgrade") {
+                // Add your logic for "upgrade" here
+            } else if (answers.entrypoint == "status") {
+                // Add your logic for "status" here
+            }
+        })
+        .catch((error: Error) => {
+            handleGenericError(error);
+        });
+}
+
+function handleFileSystemError(error: any): void {
+    if (error.code === 'EACCES') {
+        console.error('Permission denied');
+    } else if (error.code === 'ENOENT') {
+        console.error('File or directory not found');
+    } else {
+        console.error('Unknown file system error:', error.message);
+    }
+}
+
+function handleGenericError(error: Error): void {
+    if (error instanceof Error) {
+        console.error('Generic error:', error.message);
+    } else {
+        console.error('Unknown error:', error);
+    }
+}
+
+
+
+recurse({ options: ["init", "apply", "status", "remove", "upgrade"], layer: 1 });
