@@ -158,7 +158,8 @@ func main() {
 
 	var cred = &syscall.Credential{UID, GUID, []uint32{}, true} // Provide empty slices for Groups and SupplementaryGroups
 	// the Noctty flag is used to detach the process from the parent tty
-	var sysproc = &syscall.SysProcAttr{Credential: cred, Noctty: true, Setpgid: true}
+	//Noctty: true,
+	var sysproc = &syscall.SysProcAttr{Credential: cred,  Setpgid: true}
 	var attr = os.ProcAttr{
 		Dir:   ".",
 		Env:   os.Environ(),
