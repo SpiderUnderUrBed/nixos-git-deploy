@@ -8,21 +8,24 @@ import (
 	"os"
 	//"os/signal"
 	"strings"
-	"syscall"
+	//"syscall"
 	"time"
 	//"sync"
+	
 	"path/filepath"
 	"strconv"
+	"os/exec"
 	//"github.com/foresthoffman/reap"
+	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 )
 
-const (
-    UID = 501
-    GUID = 100
-    )
+// const (
+//     UID = 1000
+//     GUID = 1000
+//     )
 var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 var watchedFiles = make(map[string]bool)
 
@@ -135,50 +138,59 @@ func copyFile(src, dest string) error {
 func runChildProcess() {
 	// Function to be executed in child process
 	fmt.Println("Running in child process")
+	err := unix.Setpgid(0, 0)
+    if err != nil {
+        fmt.Println("Error setting process group ID:", err)
+        os.Exit(1)
+    }
 		// Sleep for 100 seconds
 	time.Sleep(100 * time.Second)
 }
 
 func main() {
-    // Check if there are any command-line arguments
+	
+    //Check if there are any command-line arguments
 	if len(os.Args) > 1 && os.Args[1] == "child" {
 		// This is the child process
 		runChildProcess()
 		return
 	}
 
-	parentPID := strconv.Itoa(os.Getppid())
-	fmt.Println("Parent process running with PID: " + parentPID)
+	cmd := exec.Command("./nixos-git-deploy-go", "child")
+    cmd.Start()
+	fmt.Println(strconv.Itoa(cmd.Process.Pid))
+	// parentPID := strconv.Itoa(os.Getppid())
+	// fmt.Println("Parent process running with PID: " + parentPID)
 
-	// if parentPID == "1" {
-	// 	// Child process code
-	// 	runChildProcess()
-	// 	return
+	// // if parentPID == "1" {
+	// // 	// Child process code
+	// // 	runChildProcess()
+	// // 	return
+	// // }
+
+	// var cred = &syscall.Credential{UID, GUID, []uint32{}, true} // Provide empty slices for Groups and SupplementaryGroups
+	// // the Noctty flag is used to detach the process from the parent tty
+	// //Noctty: true,
+	// var sysproc = &syscall.SysProcAttr{Credential: cred,  Setpgid: true}
+	// var attr = os.ProcAttr{
+	// 	Dir:   ".",
+	// 	Env:   os.Environ(),
+	// 	Files: []*os.File{os.Stdin, nil, nil},
+	// 	Sys:   sysproc,
 	// }
-
-	var cred = &syscall.Credential{UID, GUID, []uint32{}, true} // Provide empty slices for Groups and SupplementaryGroups
-	// the Noctty flag is used to detach the process from the parent tty
-	//Noctty: true,
-	var sysproc = &syscall.SysProcAttr{Credential: cred,  Setpgid: true}
-	var attr = os.ProcAttr{
-		Dir:   ".",
-		Env:   os.Environ(),
-		Files: []*os.File{os.Stdin, nil, nil},
-		Sys:   sysproc,
-	}
-	process, err := os.StartProcess("./nixos-git-deploy-go", []string{"./nixos-git-deploy-go", "child"}, &attr)
-	if err == nil {
-		// Print the PID of the process
-		fmt.Println("PID:", process.Pid)
+	// process, err := os.StartProcess("./nixos-git-deploy-go", []string{"./nixos-git-deploy-go", "child"}, &attr)
+	// if err == nil {
+	// 	// Print the PID of the process
+	// 	fmt.Println("PID:", process.Pid)
 		
-		// It is not clear from docs, but Release actually detaches the process
-		err = process.Release()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	} else {
-		fmt.Println(err.Error())
-	}
+	// 	// It is not clear from docs, but Release actually detaches the process
+	// 	err = process.Release()
+	// 	if err != nil {
+	// 		fmt.Println(err.Error())
+	// 	}
+	// } else {
+	// 	fmt.Println(err.Error())
+	// }
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
