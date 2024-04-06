@@ -9,7 +9,7 @@ import (
 	//"os/signal"
 	"strings"
 	"syscall"
-	//"time"
+	"time"
 	//"sync"
 	"path/filepath"
 	"strconv"
@@ -135,17 +135,26 @@ func copyFile(src, dest string) error {
 func runChildProcess() {
 	// Function to be executed in child process
 	fmt.Println("Running in child process")
+		// Sleep for 100 seconds
+	time.Sleep(100 * time.Second)
 }
 
 func main() {
-	parentPID := strconv.Itoa(os.Getppid())
-	fmt.Println("Parent process running with PID: " + parentPID)
-
-	if parentPID == "1" {
-		// Child process code
+    // Check if there are any command-line arguments
+	if len(os.Args) > 1 && os.Args[1] == "child" {
+		// This is the child process
 		runChildProcess()
 		return
 	}
+
+	parentPID := strconv.Itoa(os.Getppid())
+	fmt.Println("Parent process running with PID: " + parentPID)
+
+	// if parentPID == "1" {
+	// 	// Child process code
+	// 	runChildProcess()
+	// 	return
+	// }
 
 	var cred = &syscall.Credential{UID, GUID, []uint32{}, true} // Provide empty slices for Groups and SupplementaryGroups
 	// the Noctty flag is used to detach the process from the parent tty
@@ -156,7 +165,7 @@ func main() {
 		Files: []*os.File{os.Stdin, nil, nil},
 		Sys:   sysproc,
 	}
-	process, err := os.StartProcess("./nixos-git-deploy-go", nil, &attr)
+	process, err := os.StartProcess("./nixos-git-deploy-go", []string{"./nixos-git-deploy-go", "child"}, &attr)
 	if err == nil {
 		// Print the PID of the process
 		fmt.Println("PID:", process.Pid)
