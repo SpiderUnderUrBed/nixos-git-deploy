@@ -6,128 +6,96 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+	//"os/signal"
 	"strings"
 	"syscall"
-	"log"
 	"time"
-	//"syscall"
+	//"sync"
+	"log"
+	"path/filepath"
+	//"strconv"
 	"os/exec"
-	"strconv"
-	"golang.org/x/sys/unix"
+	//"github.com/foresthoffman/reap"
+	//"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 )
 
+// const (
+//     UID = 1000
+//     GUID = 1000
+//     )
 var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 var watchedFiles = make(map[string]bool)
+//var pipeFile rune
 
-// Function to modify the file within the Git repository
 func modifyFile(filename string) error {
-	// Splits the filename by '/' to get all elements in a path
 	parts := strings.Split(filename, "/")
-	// Once you split it, you can find the ACTUAL filename
 	fileName := parts[len(parts)-1]
-
-	// Gets the absolute path of the coorosponding git file
 	gitFilePath := filepath.Join(gitDirectory, fileName)
-
-	// Read the content of the original file
 	content, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-
-	// TODO: See if go lets you append the newly added content to the file instead of overriting the whole thing with itself?
 	modifiedContent := string(content)
-
-	// Write the modified contents back to the file in the Git directory
 	if err := ioutil.WriteFile(gitFilePath, []byte(modifiedContent), 0644); err != nil {
 		return err
 	}
-
-	// Open the Git repository
 	r, err := git.PlainOpen(gitDirectory)
 	if err != nil {
 		return err
 	}
-
-	// Get the worktree
 	worktree, err := r.Worktree()
 	if err != nil {
 		return err
 	}
-
-	// Add the modified file to the Git staging area
 	if _, err := worktree.Add(fileName); err != nil {
 		return err
 	}
-
-	//fmt.Printf("File %s has been successfully modified in the Git repository\n", fileName)
 	return nil
 }
 
-// Function to add files to Git repository
 func addFilesToGit(files []string, r *git.Repository) error {
 	worktree, err := r.Worktree()
 	if err != nil {
 		return err
 	}
-
 	for _, file := range files {
-		// Check if the file exists
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			fmt.Println("File does not exist:", file)
 			continue
 		}
-
-		// Determine the filename without the path
 		fileName := filepath.Base(file)
-
-		// Destination path in the Git directory
 		destination := filepath.Join(gitDirectory, fileName)
-
-		// Copy the file to the Git directory
 		if err := copyFile(file, destination); err != nil {
 			return err
 		}
-
-		// Add the file to the Git repository
 		_, err := worktree.Add(fileName)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-// Function to watch for file changes
 func watchChanges(filename string) {
-	// Check if the file is already being watched
 	if _, ok := watchedFiles[filename]; ok {
 		fmt.Printf("File %s is already being watched\n", filename)
 		return
 	}
-
-	// Create a new watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		fmt.Printf("Error creating watcher for file %s: %v\n", filename, err)
 		return
 	}
 	defer watcher.Close()
-
-	// Add the file to the watcher
 	err = watcher.Add(filename)
 	if err != nil {
 		fmt.Printf("Error adding file %s to watcher: %v\n", filename, err)
 		return
 	}
 	watchedFiles[filename] = true
-
-	// Start watching for events
 	fmt.Printf("Watching for changes in file: %s\n", filename)
 	for {
 		select {
@@ -136,7 +104,6 @@ func watchChanges(filename string) {
 				return
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				//fmt.Printf("File %s has been modified\n", filename)
 				err := modifyFile(filename)
 				if err != nil {
 					fmt.Println("ERROR:", err)
@@ -151,70 +118,47 @@ func watchChanges(filename string) {
 	}
 }
 
-// Function to copy a file
 func copyFile(src, dest string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
-
 	destinationFile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
 	defer destinationFile.Close()
-
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
-func Reader(pipeFile string){
-// Delete existing pipes
-fmt.Println("Cleanup existing FIFO file")
-os.Remove(pipeFile)
-
-// Create pipe
-fmt.Println("Creating " + pipeFile + " FIFO file")
-err := syscall.Mkfifo(pipeFile, 0640)
-if err != nil {
-	fmt.Println("Failed to create pipe")
-	panic(err)
-}
-
-// Open pipe for read only
-fmt.Println("Starting read operation")
-pipe, err := os.OpenFile(pipeFile, os.O_RDONLY, 0640)
-if err != nil {
-	fmt.Println("Couldn't open pipe with error: ", err)
-}
-defer pipe.Close()
-
-// Read the content of named pipe
-reader := bufio.NewReader(pipe)
-fmt.Println("READER >> created")
-
-// Infinite loop
-for {
-	line, err := reader.ReadBytes('\n')
-	// Close the pipe once EOF is reached
+func reader(pipeFile string){
+	os.Remove(pipeFile)
+	err := syscall.Mkfifo(pipeFile, 0666)
 	if err != nil {
-		fmt.Println("FINISHED!")
-		os.Exit(0)
+		log.Fatal("Make named pipe file error:", err)
+	}
+	//go scheduleWrite()
+	fmt.Println("open a named pipe file for read.")
+	file, err := os.OpenFile(pipeFile, os.O_CREATE, os.ModeNamedPipe)
+	if err != nil {
+		log.Fatal("Open named pipe file error:", err)
 	}
 
-	// Remove new line char
-	nline := string(line)
-	nline = strings.TrimRight(nline, "\r\n")
-	fmt.Printf("READER >> reading line: %+v\n", nline)
+	reader := bufio.NewReader(file)
 
-}
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err == nil {
+			fmt.Print("load string:" + string(line))
+		}
+	}
 }
 
-func writer(pipeFile string){
+func writer(pipeFile string) {
 	fmt.Println("start schedule writing.")
 	f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
@@ -228,36 +172,31 @@ func writer(pipeFile string){
 		time.Sleep(time.Second)
 	}
 }
+
 func runChildProcess() {
-	unix.Setpgid(0, 0)
-    // Function to be executed in child process
-    fmt.Println("Running in child process")
-        // Sleep for 100 seconds
-    time.Sleep(100 * time.Second)
+	// Function to be executed in child process
+	fmt.Println("Running in child process")
+	reader("pipe.log")
+	// Sleep for a short duration to ensure the writer starts writing
+	//time.Sleep(1 * time.Second)
 }
 
 func main() {
-    
-    //Check if there are any command-line arguments
-    if len(os.Args) > 1 && os.Args[1] == "child" {
-        // This is the child process
-        runChildProcess()
-        return
-    }
 
-    cmd := exec.Command("./nixos-git-deploy-go", "child")
-    cmd.Start()
-    fmt.Println(strconv.Itoa(cmd.Process.Pid))
+	// Start the child process
+	cmd := exec.Command(os.Args[0], "child")
+	cmd.Start()
+	reader("pipe.log")
+	// Start the reader in the parent process
+	//reader(pipeFile)
+
 	reader := bufio.NewReader(os.Stdin)
-	Reader()
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add", "remote-init"}
-
 		fmt.Println("What do you want to do?")
 		for i, option := range options {
 			fmt.Printf("%d. %s\n", i+1, option)
 		}
-
 		fmt.Print("Enter your choice (1-7): ")
 		choice, _ := reader.ReadString('\n')
 		choice = strings.TrimSpace(choice)
@@ -317,16 +256,7 @@ func main() {
 			if err != nil {
 				fmt.Println("Error adding remote:", err)
 			}
-		case "apply":
-			// Add your logic for "apply" here
-		case "remove":
-			// Add your logic for "remove" here
-		case "upgrade":
-			// Add your logic for "upgrade" here
-		case "status":
-			// Add your logic for "status" here
 		case "add":
-			// Add logic for adding files
 			fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
 			filesInput, _ := reader.ReadString('\n')
 			filesInput = strings.TrimSpace(filesInput)
@@ -340,8 +270,6 @@ func main() {
 						fmt.Printf("Added %d file(s) to Git\n", len(files))
 					}
 				}()
-
-				// Start file watchers for added files in separate goroutines
 				for _, file := range files {
 					go watchChanges(file)
 				}
@@ -352,14 +280,12 @@ func main() {
 	}
 }
 
-// Function to create directory if it doesn't exist
 func ensureDirectoryExists(directory string) {
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
 		os.MkdirAll(directory, 0755)
 	}
 }
 
-// Function to check if directory exists
 func ifDirectoryExists(directory string) bool {
 	_, err := os.Stat(directory)
 	return !os.IsNotExist(err)

@@ -11,10 +11,6 @@ import (
 	"syscall"
 	"log"
 	"time"
-	//"syscall"
-	"os/exec"
-	"strconv"
-	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -228,26 +224,7 @@ func writer(pipeFile string){
 		time.Sleep(time.Second)
 	}
 }
-func runChildProcess() {
-	unix.Setpgid(0, 0)
-    // Function to be executed in child process
-    fmt.Println("Running in child process")
-        // Sleep for 100 seconds
-    time.Sleep(100 * time.Second)
-}
-
 func main() {
-    
-    //Check if there are any command-line arguments
-    if len(os.Args) > 1 && os.Args[1] == "child" {
-        // This is the child process
-        runChildProcess()
-        return
-    }
-
-    cmd := exec.Command("./nixos-git-deploy-go", "child")
-    cmd.Start()
-    fmt.Println(strconv.Itoa(cmd.Process.Pid))
 	reader := bufio.NewReader(os.Stdin)
 	Reader()
 	for {
