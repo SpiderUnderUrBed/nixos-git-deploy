@@ -231,6 +231,7 @@ func writer(pipeFile string){
 func runChildProcess() {
 	unix.Setpgid(0, 0)
     // Function to be executed in child process
+	writer("pipe.log")
     fmt.Println("Running in child process")
         // Sleep for 100 seconds
     time.Sleep(100 * time.Second)
@@ -249,7 +250,7 @@ func main() {
     cmd.Start()
     fmt.Println(strconv.Itoa(cmd.Process.Pid))
 	reader := bufio.NewReader(os.Stdin)
-	Reader()
+	Reader("pipe.log")
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add", "remote-init"}
 
