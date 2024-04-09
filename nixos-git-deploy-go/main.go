@@ -25,8 +25,8 @@ var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 var watchedFiles = make(map[string]bool)
 
 type Config struct {
-	UserAllowed string `json:"userallowed"`
-	FirstTime   string `json:"firstTime"`
+	UserAllowed string `json:"UserAllowed"`
+	FirstTime   string `json:"FirstTime"`
 }
 
 // type Settings struct {
@@ -259,35 +259,55 @@ func main() {
 
 	//type Settings struc {
 
-	//}
-	configFile := Config{
-		UserAllowed: "n",
-		FirstTime:   "y",
-	}
-
-	rawConfig, err := os.Open("config.json")
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return
-	}
-	defer rawConfig.Close()
-
-	formattedConfig, err := ioutil.ReadAll(rawConfig)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return
-	}
-
-	err = json.Unmarshal(formattedConfig, &configFile)
-	if err != nil {
-		fmt.Println("Error unmarshalling JSON:", err)
-		return
-	}
-
-	fomated_config, _ := ioutil.ReadAll(rawConfig)
-	var settings Config 
-	err = json.Unmarshal(fomated_config, &settings)
+		configFile := Config{
+			UserAllowed: "n",
+			FirstTime:   "y",
+		}
 	
+		rawConfig, err := os.Open("./config.json")
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer rawConfig.Close()
+	
+		formattedConfig, err := ioutil.ReadAll(rawConfig)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
+	
+		err = json.Unmarshal(formattedConfig, &configFile)
+		if err != nil {
+			fmt.Println("Error unmarshalling JSON:", err)
+			return
+		}
+	
+		// Reset file cursor to beginning
+		_, err = rawConfig.Seek(0, 0)
+		if err != nil {
+			fmt.Println("Error seeking file:", err)
+			return
+		}
+	
+		fomated_config, err := ioutil.ReadAll(rawConfig)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
+	
+		var settings Config
+		err = json.Unmarshal(fomated_config, &settings)
+		if err != nil {
+			fmt.Println("Error unmarshalling JSON:", err)
+			return
+		}
+	
+		fmt.Println(settings)
+	//fmt.Print(settings)
+	if (settings.UserAllowed == "n"){
+		print("user not allowed")
+	}
 	fmt.Print(" Hello! This is nixos-git-deploy.\n If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
 
 	userallow, _ := reader.ReadString('\n')
