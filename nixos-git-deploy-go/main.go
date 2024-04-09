@@ -13,7 +13,8 @@ import (
 	"time"
 	//"syscall"
 	"os/exec"
-	"strconv"
+	//"strconv"
+	"encoding/json"
 	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
@@ -23,6 +24,15 @@ import (
 var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 var watchedFiles = make(map[string]bool)
 
+type Config struct {
+	UserAllowed string `json:"userallowed"`
+	FirstTime   string `json:"firstTime"`
+}
+
+// type Settings struct {
+// 	UserAllowed: "n",
+// 	firstTi 
+// }
 // Function to modify the file within the Git repository
 func modifyFile(filename string) error {
 	// Splits the filename by '/' to get all elements in a path
@@ -174,11 +184,11 @@ func copyFile(src, dest string) error {
 }
 func Reader(pipeFile string){
 // Delete existing pipes
-fmt.Println("Cleanup existing FIFO file")
+//fmt.Println("Cleanup existing FIFO file")
 os.Remove(pipeFile)
 
 // Create pipe
-fmt.Println("Creating " + pipeFile + " FIFO file")
+//fmt.Println("Creating " + pipeFile + " FIFO file")
 err := syscall.Mkfifo(pipeFile, 0640)
 if err != nil {
 	fmt.Println("Failed to create pipe")
@@ -186,7 +196,7 @@ if err != nil {
 }
 
 // Open pipe for read only
-fmt.Println("Starting read operation")
+//fmt.Println("Starting read operation")
 pipe, err := os.OpenFile(pipeFile, os.O_RDONLY, 0640)
 if err != nil {
 	fmt.Println("Couldn't open pipe with error: ", err)
@@ -195,22 +205,21 @@ defer pipe.Close()
 
 // Read the content of named pipe
 reader := bufio.NewReader(pipe)
-fmt.Println("READER >> created")
+//fmt.Println("READER >> created")
 
 // Infinite loop
 for {
 	line, err := reader.ReadBytes('\n')
 	// Close the pipe once EOF is reached
 	if err != nil {
-		fmt.Println("FINISHED!")
+		fmt.Println("exited!")
 		os.Exit(0)
 	}
 
 	// Remove new line char
 	nline := string(line)
 	nline = strings.TrimRight(nline, "\r\n")
-	fmt.Printf("READER >> reading line: %+v\n", nline)
-
+	//	fmt.Printf("READER >> reading line: %+v\n", nline)
 }
 }
 
@@ -231,7 +240,7 @@ func writer(pipeFile string){
 func runChildProcess() {
 	unix.Setpgid(0, 0)
     // Function to be executed in child process
-	writer("pipe.log")
+	go writer("pipe.log")
     fmt.Println("Running in child process")
         // Sleep for 100 seconds
     time.Sleep(100 * time.Second)
@@ -246,20 +255,75 @@ func main() {
         return
     }
 
+	reader := bufio.NewReader(os.Stdin)
+
+	//type Settings struc {
+
+	//}
+	configFile := Config{
+		UserAllowed: "n",
+		FirstTime:   "y",
+	}
+
+	rawConfig, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer rawConfig.Close()
+
+	formattedConfig, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+
+	err = json.Unmarshal(formattedConfig, &configFile)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return
+	}
+
+	fomated_config, _ := ioutil.ReadAll(rawConfig)
+	var settings Config 
+	err = json.Unmarshal(fomated_config, &settings)
+	
+	fmt.Print(" Hello! This is nixos-git-deploy.\n If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
+
+	userallow, _ := reader.ReadString('\n')
+	userallow = strings.TrimSpace(userallow)
+	if (userallow == "n"){
+		jsonData, err := json.Marshal(configFile)
+		if err != nil {
+			fmt.Println("Error with JSON:", err)
+		}
+
+		err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+		if err != nil {
+			fmt.Println("Error with file:", err)
+		}
+		//err = ioutil.WriteFile("./config.json", []byte(json.Unmarshal([]bytejson.Marshal(configFile))), 0644)
+	} else {
+
+	}
+
+	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
     cmd.Start()
-    fmt.Println(strconv.Itoa(cmd.Process.Pid))
-	reader := bufio.NewReader(os.Stdin)
-	Reader("pipe.log")
+    //fmt.Println(strconv.Itoa(cmd.Process.Pid))
+
+	go Reader("pipe.log")
+
+	//fmt.Sscanf("testing", "testing")
 	for {
-		options := []string{"init", "apply", "status", "remove", "upgrade", "add", "remote-init"}
+		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init"}
 
 		fmt.Println("What do you want to do?")
 		for i, option := range options {
 			fmt.Printf("%d. %s\n", i+1, option)
 		}
 
-		fmt.Print("Enter your choice (1-7): ")
+		fmt.Print("Enter your choice (1-8): ")
 		choice, _ := reader.ReadString('\n')
 		choice = strings.TrimSpace(choice)
 		index := -1
@@ -326,7 +390,7 @@ func main() {
 			// Add your logic for "upgrade" here
 		case "status":
 			// Add your logic for "status" here
-		case "add":
+		case "add-automatic":
 			// Add logic for adding files
 			fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
 			filesInput, _ := reader.ReadString('\n')
