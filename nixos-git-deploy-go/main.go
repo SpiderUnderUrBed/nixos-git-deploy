@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	//"log"
+	"log"
 	"time"
 	//"syscall"
 	"os/exec"
@@ -196,46 +196,39 @@ func keepAlive(f *os.File, origin string) {
         time.Sleep(time.Second)
     }
 }
-func Reader(pipeFile string){
-// Delete existing pipes
-//fmt.Println("Cleanup existing FIFO file")
-os.Remove(pipeFile)
+func Reader(pipeFile string) {
+    // Open the named pipe for reading
+    pipe, err := os.Open(pipeFile)
+    if os.IsNotExist(err) {
+        log.Fatalf("Named pipe '%s' does not exist", pipeFile)
+    } else if os.IsPermission(err) {
+        log.Fatalf("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
+    } else if err != nil {
+        log.Fatalf("Error while opening named pipe '%s': %s", pipeFile, err)
+    }
+    defer pipe.Close()
 
-// Create pipe
-//fmt.Println("Creating " + pipeFile + " FIFO file")
-err := syscall.Mkfifo(pipeFile, 0640)
-if err != nil {
-	fmt.Println("Failed to create pipe")
-	panic(err)
+    // Infinite loop for reading from the named pipe
+    for {
+        // Read from the named pipe
+        data := make([]byte, 1024) // Read buffer size
+        n, err := pipe.Read(data)
+        if err != nil {
+            if err == io.EOF {
+                // End of file (named pipe closed), continue reading
+                continue
+            }
+            log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
+        }
+        // Process the read data
+        processData(data[:n])
+    }
 }
 
-// Open pipe for read only
-//fmt.Println("Starting read operation")
-pipe, err := os.OpenFile(pipeFile, os.O_RDONLY, 0640)
-if err != nil {
-	fmt.Println("Couldn't open pipe with error: ", err)
-}
-defer pipe.Close()
-
-// Read the content of named pipe
-reader := bufio.NewReader(pipe)
-//fmt.Println("READER >> created")
-
-// Infinite loop
-for {
-	//fmt.Println("t")
-	line, err := reader.ReadBytes('\n')
-	// Close the pipe once EOF is reached
-	if err != nil {
-		fmt.Println("exited!")
-		os.Exit(0)
-	}
-
-	// Remove new line char
-	nline := string(line)
-	nline = strings.TrimRight(nline, "\r\n")
-		fmt.Printf("READER >> reading line: %+v\n", nline)
-}
+func processData(data []byte) {
+    // Process the data read from the named pipe
+    fmt.Printf("Received data from named pipe: %s\n", string(data))
+    // Implement your logic here to handle the received data
 }
 
 func writer(pipeFile string, origin string, messages chan string) *os.File {
@@ -249,6 +242,7 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     // Continuously wait for messages and write them to the file
 	for msg := range messages {
 		//fmt.Println("TEST")
+		//fmt.Println(msg)
         _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
         if err != nil {
             fmt.Printf("Error writing to file: %v\n", err)
