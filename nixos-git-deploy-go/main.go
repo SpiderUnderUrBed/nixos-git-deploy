@@ -14,7 +14,7 @@ import (
 	"time"
 	//"syscall"
 	"os/exec"
-	//"strconv"
+	"strconv"
 	"encoding/json"
 	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
@@ -196,7 +196,7 @@ func keepAlive(f *os.File, origin string) {
         time.Sleep(time.Second)
     }
 }
-func Reader(pipeFile string) {
+func Reader(pipeFile string, origin string, messages chan string) {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
@@ -221,13 +221,17 @@ func Reader(pipeFile string) {
             log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
         }
         // Process the read data
-        processData(data[:n])
+        processData(data[:n], origin, messages)
     }
 }
 
-func processData(data []byte) {
+func processData(data []byte, origin string, messages chan string) {
     // Process the data read from the named pipe
     fmt.Printf("Received data from named pipe: %s\n", string(data))
+
+	//if (origin == "child"){
+		messages <- "We got the data from pipe"
+	//}
     // Implement your logic here to handle the received data
 }
 
@@ -256,16 +260,15 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     
     // Return the opened file
     return f
-}
+} 
 
 func runChildProcess() {
 	unix.Setpgid(0, 0)
     // Function to be executed in child process
 	messages := make(chan string)
-	go writer("detach.log", "child", messages)
 	//f := writer("detach.log", "child")
-	go Reader("detach.log")
-
+	go Reader("recede.log", "child", messages)
+	writer("detach.log", "child", messages)
 	//go keepAlive(f, "parent")
     fmt.Println("Running in child process")
         // Sleep for 100 seconds
@@ -405,10 +408,10 @@ func main() {
 	messages := make(chan string)
 	
 	go cleanup(messages)
-	//fmt.Println(strconv.Itoa(cmd.Process.Pid))
+	fmt.Println(strconv.Itoa(cmd.Process.Pid))
 	
 	go writer("recede.log", "parent", messages)
-	go Reader("recede.log")
+	go Reader("detach.log", "parent", messages)
 	//go Reader("detach.log")
 
 	//go keepAlive(f, "parent")
