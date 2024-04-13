@@ -16,7 +16,7 @@ import (
 	"os/exec"
 	"strconv"
 	"encoding/json"
-	"golang.org/x/sys/unix"
+	//"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -196,6 +196,27 @@ func keepAlive(f *os.File, origin string) {
         time.Sleep(time.Second)
     }
 }
+
+
+
+
+func runChildProcess() {
+	//unix.Setpgid(0, 0)
+	//var stdout bytes.Buffer
+    // Function to be executed in child process
+	messages := make(chan string, 10000)
+	//f := writer("detach.log", "child")
+	go Reader("recede.log", "child", messages)
+	go writer("detach.log", "child", messages)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	//keepAlive(f, "parent")
+    fmt.Println("Running in child process")
+        // Sleep for 100 seconds
+		//time.Sleep(100 * time.Second)
+}
 func Reader(pipeFile string, origin string, messages chan string) {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
@@ -227,10 +248,10 @@ func Reader(pipeFile string, origin string, messages chan string) {
 
 func processData(data []byte, origin string, messages chan string) {
     // Process the data read from the named pipe
-    fmt.Printf("Received data from named pipe: %s\n", string(data))
+   // fmt.Printf("Received data from named pipe: %s\n", string(data))
 
 	//if (origin == "child"){
-		messages <- "We got the data from pipe"
+		messages <- "test"
 	//}
     // Implement your logic here to handle the received data
 }
@@ -254,7 +275,6 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
         }
     }
     
-    
     // Close the file before returning
     f.Close()
     
@@ -262,18 +282,7 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     return f
 } 
 
-func runChildProcess() {
-	unix.Setpgid(0, 0)
-    // Function to be executed in child process
-	messages := make(chan string)
-	//f := writer("detach.log", "child")
-	go Reader("recede.log", "child", messages)
-	writer("detach.log", "child", messages)
-	//go keepAlive(f, "parent")
-    fmt.Println("Running in child process")
-        // Sleep for 100 seconds
-		//time.Sleep(100 * time.Second)
-}
+
 func cleanup(messages chan string) {
 	// Handle SIGINT (Ctrl+C) signal to perform cleanup before exiting
 	c := make(chan os.Signal, 1)
@@ -398,12 +407,29 @@ func main() {
 	} else {
 
 	}
-	
+	if _, err := os.Stat("detach.log"); err == nil {
+		fmt.Println("Named pipe", "detach.log", "already exists.")
+	} else {
+		err := syscall.Mkfifo("detach.log", 0600)
+		if err != nil {
+			fmt.Println("Error wit pipe file:", err)
+		}
+	}
+
+	if _, err := os.Stat("recede.log"); err == nil {
+		fmt.Println("Named pipe", "recede.log", "already exists.")
+	} else {
+		err := syscall.Mkfifo("recede.log", 0600)
+		if err != nil {
+			fmt.Println("Error wit pipe file:", err)
+		}
+	}
+
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
     cmd.Start()
 
-	go killProcess(cmd.Process.Pid)
+	//go killProcess(cmd.Process.Pid)
     
 	messages := make(chan string)
 	
