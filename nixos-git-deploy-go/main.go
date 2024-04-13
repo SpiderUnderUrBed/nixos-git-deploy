@@ -6,10 +6,11 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
-	"log"
+	//"log"
 	"time"
 	//"syscall"
 	"os/exec"
@@ -25,8 +26,8 @@ var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 var watchedFiles = make(map[string]bool)
 
 type Config struct {
-	UserAllowed string `json:"userallowed"`
-	FirstTime   string `json:"firstTime"`
+	UserAllowed string `json:"UserAllowed"`
+	FirstTime   string `json:"FirstTime"`
 }
 
 // type Settings struct {
@@ -182,6 +183,19 @@ func copyFile(src, dest string) error {
 
 	return nil
 }
+func keepAlive(f *os.File, origin string) {
+    i := 0
+    for {
+        // Write string to the named pipe file.
+        _, err := f.WriteString(fmt.Sprintf("%s: test write times: %d\n", origin, i))
+        if err != nil {
+            fmt.Printf("Error writing to file: %v\n", err)
+            return
+        }
+        i++
+        time.Sleep(time.Second)
+    }
+}
 func Reader(pipeFile string){
 // Delete existing pipes
 //fmt.Println("Cleanup existing FIFO file")
@@ -209,6 +223,7 @@ reader := bufio.NewReader(pipe)
 
 // Infinite loop
 for {
+	//fmt.Println("t")
 	line, err := reader.ReadBytes('\n')
 	// Close the pipe once EOF is reached
 	if err != nil {
@@ -219,33 +234,88 @@ for {
 	// Remove new line char
 	nline := string(line)
 	nline = strings.TrimRight(nline, "\r\n")
-	//	fmt.Printf("READER >> reading line: %+v\n", nline)
+		fmt.Printf("READER >> reading line: %+v\n", nline)
 }
 }
 
-func writer(pipeFile string){
-	fmt.Println("start schedule writing.")
-	f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	i := 0
-	for {
-		fmt.Println("write string to named pipe file.")
-		f.WriteString(fmt.Sprintf("test write times:%d\n", i))
-		i++
-		time.Sleep(time.Second)
-	}
+func writer(pipeFile string, origin string, messages chan string) *os.File {
+    // Open the file
+    f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
+    if err != nil {
+        fmt.Printf("Error opening file: %v\n", err)
+        return nil // Return nil if there's an error
+    }
+    
+    // Continuously wait for messages and write them to the file
+	for msg := range messages {
+		//fmt.Println("TEST")
+        _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
+        if err != nil {
+            fmt.Printf("Error writing to file: %v\n", err)
+            break // Break the loop if there's an error
+        }
+    }
+    
+    
+    // Close the file before returning
+    f.Close()
+    
+    // Return the opened file
+    return f
 }
+
 func runChildProcess() {
 	unix.Setpgid(0, 0)
     // Function to be executed in child process
-	go writer("pipe.log")
+	messages := make(chan string)
+	go writer("detach.log", "child", messages)
+	//f := writer("detach.log", "child")
+	go Reader("detach.log")
+
+	//go keepAlive(f, "parent")
     fmt.Println("Running in child process")
         // Sleep for 100 seconds
-    time.Sleep(100 * time.Second)
+		//time.Sleep(100 * time.Second)
+}
+func cleanup(messages chan string) {
+	// Handle SIGINT (Ctrl+C) signal to perform cleanup before exiting
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	// Block until a signal is received
+	<-c
+
+	// Close the messages channel to stop writer goroutine
+	close(messages)
+
+	// Perform cleanup actions
+	fmt.Println("Performing cleanup actions...")
+	// Add your cleanup code here
+
+	// Exit the program gracefully
+	os.Exit(0)
 }
 
+func killProcess(pid int) error {
+    // Find the process by its PID
+    proc, err := os.FindProcess(pid)
+    if err != nil {
+        return fmt.Errorf("error finding process: %v", err)
+    }
+    
+    // Check if the process is nil
+    if proc == nil {
+        return fmt.Errorf("process with PID %d not found", pid)
+    }
+
+    // Send SIGTERM signal to the process
+    err = proc.Signal(syscall.SIGTERM)
+    if err != nil {
+        return fmt.Errorf("error sending SIGTERM signal: %v", err)
+    }
+
+    return nil
+}
 func main() {
     
     //Check if there are any command-line arguments
@@ -259,41 +329,66 @@ func main() {
 
 	//type Settings struc {
 
-	//}
-	configFile := Config{
-		UserAllowed: "n",
-		FirstTime:   "y",
-	}
-
-	rawConfig, err := os.Open("config.json")
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return
-	}
-	defer rawConfig.Close()
-
-	formattedConfig, err := ioutil.ReadAll(rawConfig)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return
-	}
-
-	err = json.Unmarshal(formattedConfig, &configFile)
-	if err != nil {
-		fmt.Println("Error unmarshalling JSON:", err)
-		return
-	}
-
-	fomated_config, _ := ioutil.ReadAll(rawConfig)
-	var settings Config 
-	err = json.Unmarshal(fomated_config, &settings)
+		configFile := Config{
+			UserAllowed: "y",
+			FirstTime:   "y",
+		}
 	
+		rawConfig, err := os.Open("./config.json")
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer rawConfig.Close()
+
+		formattedConfig, err := ioutil.ReadAll(rawConfig)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
+	
+		err = json.Unmarshal(formattedConfig, &configFile)
+		if err != nil {
+			fmt.Println("Error unmarshalling JSON:", err)
+			return
+		}
+	
+		// Reset file cursor to beginning
+		_, err = rawConfig.Seek(0, 0)
+		if err != nil {
+			fmt.Println("Error seeking file:", err)
+			return
+		}
+	
+		fomated_config, err := ioutil.ReadAll(rawConfig)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
+	
+		var settings Config
+		err = json.Unmarshal(fomated_config, &settings)
+		if err != nil {
+			fmt.Println("Error unmarshalling JSON:", err)
+			return
+		}
+	
+		//fmt.Println(settings)
+	//fmt.Print(settings)
+	if (settings.FirstTime == "y"){
+	//	print("user not allowed")
+	configFile.FirstTime = "n"
 	fmt.Print(" Hello! This is nixos-git-deploy.\n If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
 
 	userallow, _ := reader.ReadString('\n')
 	userallow = strings.TrimSpace(userallow)
+
 	if (userallow == "n"){
+		//fmt.Println("User inputted ")
+		configFile.UserAllowed = "n"
+	}
 		jsonData, err := json.Marshal(configFile)
+		//fmt.Println(jsonData)
 		if err != nil {
 			fmt.Println("Error with JSON:", err)
 		}
@@ -306,14 +401,23 @@ func main() {
 	} else {
 
 	}
-
+	
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
     cmd.Start()
-    //fmt.Println(strconv.Itoa(cmd.Process.Pid))
 
-	go Reader("pipe.log")
+	go killProcess(cmd.Process.Pid)
+    
+	messages := make(chan string)
+	
+	go cleanup(messages)
+	//fmt.Println(strconv.Itoa(cmd.Process.Pid))
+	
+	go writer("recede.log", "parent", messages)
+	go Reader("recede.log")
+	//go Reader("detach.log")
 
+	//go keepAlive(f, "parent")
 	//fmt.Sscanf("testing", "testing")
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init"}
@@ -408,7 +512,14 @@ func main() {
 
 				// Start file watchers for added files in separate goroutines
 				for _, file := range files {
-					go watchChanges(file)
+					fmt.Println("sending message")
+					messages <- file
+					//go watchChanges(file)
+					//_, err := f.WriteString(fmt.Sprintf(file, "parent"))
+					if err != nil {
+						fmt.Println("Error sending message:", err)
+					} 
+					fmt.Println("finished")
 				}
 			} else {
 				fmt.Println("Error opening Git repository:", err)
