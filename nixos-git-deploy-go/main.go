@@ -16,7 +16,7 @@ import (
 	"os/exec"
 	"strconv"
 	"encoding/json"
-	//"golang.org/x/sys/unix"
+	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -201,11 +201,12 @@ func keepAlive(f *os.File, origin string) {
 
 
 func runChildProcess() {
-	//unix.Setpgid(0, 0)
+	unix.Setpgid(0, 0)
 	//var stdout bytes.Buffer
     // Function to be executed in child process
 	messages := make(chan string, 10000)
 	//f := writer("detach.log", "child")
+	fmt.Println("TEST")
 	go Reader("recede.log", "child", messages)
 	go writer("detach.log", "child", messages)
 
@@ -408,7 +409,7 @@ func main() {
 
 	}
 	if _, err := os.Stat("detach.log"); err == nil {
-		fmt.Println("Named pipe", "detach.log", "already exists.")
+		//fmt.Println("Named pipe", "detach.log", "already exists.")
 	} else {
 		err := syscall.Mkfifo("detach.log", 0600)
 		if err != nil {
@@ -417,7 +418,7 @@ func main() {
 	}
 
 	if _, err := os.Stat("recede.log"); err == nil {
-		fmt.Println("Named pipe", "recede.log", "already exists.")
+		//fmt.Println("Named pipe", "recede.log", "already exists.")
 	} else {
 		err := syscall.Mkfifo("recede.log", 0600)
 		if err != nil {
@@ -427,6 +428,17 @@ func main() {
 
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
+
+	//stdoutFile, err := os.Create("stdout.log")
+	//if err != nil {
+	//	fmt.Println("Error opening stdout.log:", err)
+	//	return
+	//}
+	//defer stdoutFile.Close()
+
+	//cmd.Stdout = stdoutFile
+	cmd.Stdout = os.stdout
+
     cmd.Start()
 
 	//go killProcess(cmd.Process.Pid)
