@@ -206,7 +206,7 @@ func runChildProcess() {
     // Function to be executed in child process
 	messages := make(chan string, 10000)
 	//f := writer("detach.log", "child")
-	fmt.Println("TEST")
+	// fmt.Println("TEST")
 	go Reader("recede.log", "child", messages)
 	go writer("detach.log", "child", messages)
 
@@ -218,68 +218,57 @@ func runChildProcess() {
         // Sleep for 100 seconds
 		//time.Sleep(100 * time.Second)
 }
+
 func Reader(pipeFile string, origin string, messages chan string) {
     // Open the named pipe for reading
-	if (origin == "child"){
-		fmt.Println("child2")
-	}
-
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
-		fmt.Println("ERROR does not exist")
         log.Fatalf("Named pipe '%s' does not exist", pipeFile)
     } else if os.IsPermission(err) {
-		fmt.Println("ERROR with permissions")
         log.Fatalf("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
     } else if err != nil {
-		fmt.Println("ERROR when opening pipe")
         log.Fatalf("Error while opening named pipe '%s': %s", pipeFile, err)
     }
     defer pipe.Close()
-	if (origin == "child"){
-		fmt.Println("child5")
-	}
+
+    // Create a buffered reader to efficiently read from the named pipe
+    reader := bufio.NewReader(pipe)
+
     // Infinite loop for reading from the named pipe
+   // messages <- "We received"
     for {
-		if (origin == "child"){
-			fmt.Println("child4")
-		}
-        // Read from the named pipe
-        data := make([]byte, 1024) // Read buffer size
-        n, err := pipe.Read(data)
+        // Read a line from the named pipe
+        line, err := reader.ReadString('\n')
         if err != nil {
-            if err == io.EOF {
-                // End of file (named pipe closed), continue reading
-                continue
-            }
             log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
         }
-		if (origin == "child"){
-			fmt.Println("child3")
-		}
-		messages <- "test" + string(data[:n])
-        // Process the read data
-        // processData(data[:n], origin, messages)
+
+        // Trim any leading/trailing whitespace from the line
+        line = strings.TrimSpace(line)
+
+        // Check if the line is empty
+        if line == "" {
+            continue // Skip empty lines
+        }
+
+        // Split the line by space
+        parts := strings.SplitN(line, " ", 2)
+
+        // Check if there are at least two parts
+        if len(parts) >= 2 {
+            // Extract the arguments from the line
+            arguments := parts[1]
+
+            // Send the message to the channel
+            messages <- fmt.Sprintf("We received %s", arguments)
+        }
     }
 }
-
-// func processData(data []byte, origin string, messages chan string) {
-//     // Process the data read from the named pipe
-//    // fmt.Printf("Received data from named pipe: %s\n", string(data))
-//    if (origin == "child"){
-// 	fmt.Println("child4")
-//    }
-// 	//if (origin == "child"){
-// 		messages <- "test"
-// 	//}
-//     // Implement your logic here to handle the received data
-// }
-
 func writer(pipeFile string, origin string, messages chan string) *os.File {
     // Open the file
-	if (origin == "child"){
-		fmt.Println("child")
-	}
+	// if (origin == "child"){
+	// 	fmt.Println(pipeFile)
+	// }
 
     f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
     if err != nil {
@@ -289,7 +278,10 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     
     // Continuously wait for messages and write them to the file
 	for msg := range messages {
-		fmt.Println("TEST_2")
+		if (origin == "child"){
+			fmt.Println(msg)
+		}
+		//fmt.Println("TEST_2")
 		//fmt.Println(msg)
         _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
         if err != nil {
