@@ -220,18 +220,30 @@ func runChildProcess() {
 }
 func Reader(pipeFile string, origin string, messages chan string) {
     // Open the named pipe for reading
+	if (origin == "child"){
+		fmt.Println("child2")
+	}
+
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
+		fmt.Println("ERROR does not exist")
         log.Fatalf("Named pipe '%s' does not exist", pipeFile)
     } else if os.IsPermission(err) {
+		fmt.Println("ERROR with permissions")
         log.Fatalf("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
     } else if err != nil {
+		fmt.Println("ERROR when opening pipe")
         log.Fatalf("Error while opening named pipe '%s': %s", pipeFile, err)
     }
     defer pipe.Close()
-
+	if (origin == "child"){
+		fmt.Println("child5")
+	}
     // Infinite loop for reading from the named pipe
     for {
+		if (origin == "child"){
+			fmt.Println("child4")
+		}
         // Read from the named pipe
         data := make([]byte, 1024) // Read buffer size
         n, err := pipe.Read(data)
@@ -242,23 +254,33 @@ func Reader(pipeFile string, origin string, messages chan string) {
             }
             log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
         }
+		if (origin == "child"){
+			fmt.Println("child3")
+		}
+		messages <- "test" + string(data[:n])
         // Process the read data
-        processData(data[:n], origin, messages)
+        // processData(data[:n], origin, messages)
     }
 }
 
-func processData(data []byte, origin string, messages chan string) {
-    // Process the data read from the named pipe
-   // fmt.Printf("Received data from named pipe: %s\n", string(data))
-
-	//if (origin == "child"){
-		messages <- "test"
-	//}
-    // Implement your logic here to handle the received data
-}
+// func processData(data []byte, origin string, messages chan string) {
+//     // Process the data read from the named pipe
+//    // fmt.Printf("Received data from named pipe: %s\n", string(data))
+//    if (origin == "child"){
+// 	fmt.Println("child4")
+//    }
+// 	//if (origin == "child"){
+// 		messages <- "test"
+// 	//}
+//     // Implement your logic here to handle the received data
+// }
 
 func writer(pipeFile string, origin string, messages chan string) *os.File {
     // Open the file
+	if (origin == "child"){
+		fmt.Println("child")
+	}
+
     f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
     if err != nil {
         fmt.Printf("Error opening file: %v\n", err)
@@ -267,7 +289,7 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     
     // Continuously wait for messages and write them to the file
 	for msg := range messages {
-		//fmt.Println("TEST")
+		fmt.Println("TEST_2")
 		//fmt.Println(msg)
         _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
         if err != nil {
@@ -304,6 +326,13 @@ func cleanup(messages chan string) {
 }
 
 func killProcess(pid int) error {
+	// Handle SIGINT (Ctrl+C) signal to perform cleanup before exiting
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	
+	// Block until a signal is received
+	<-c
+	
     // Find the process by its PID
     proc, err := os.FindProcess(pid)
     if err != nil {
@@ -437,11 +466,12 @@ func main() {
 	//defer stdoutFile.Close()
 
 	//cmd.Stdout = stdoutFile
-	cmd.Stdout = os.stdout
+	cmd.Stdout = os.Stdout
+	os.Stderr = os.Stderr
 
     cmd.Start()
 
-	//go killProcess(cmd.Process.Pid)
+	go killProcess(cmd.Process.Pid)
     
 	messages := make(chan string)
 	
