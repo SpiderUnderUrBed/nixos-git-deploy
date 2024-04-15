@@ -231,45 +231,33 @@ func Reader(pipeFile string, origin string, messages chan string) {
     }
     defer pipe.Close()
 
-    // Create a buffered reader to efficiently read from the named pipe
-    reader := bufio.NewReader(pipe)
-
     // Infinite loop for reading from the named pipe
-   // messages <- "We received"
+    messages <- "We received"
     for {
-        // Read a line from the named pipe
-        line, err := reader.ReadString('\n')
+        // Read from the named pipe
+        data := make([]byte, 1024) // Read buffer size
+        n, err := pipe.Read(data)
         if err != nil {
             log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
         }
-
-        // Trim any leading/trailing whitespace from the line
-        line = strings.TrimSpace(line)
-
-        // Check if the line is empty
-        if line == "" {
-            continue // Skip empty lines
-        }
-
-        // Split the line by space
-        parts := strings.SplitN(line, " ", 2)
-
-        // Check if there are at least two parts
-        if len(parts) >= 2 {
-            // Extract the arguments from the line
-            arguments := parts[1]
-
-            // Send the message to the channel
-            messages <- fmt.Sprintf("We received %s", arguments)
-        }
+		fmt.Println(string(data[:n]))
+        // Process the read data
+        //processData(data[:n], origin, messages)
     }
 }
+
+//func processData(data []byte, origin string, messages chan string) {
+    // Process the data read from the named pipe
+   // fmt.Printf("Received data from named pipe: %s\n", string(data))
+
+	//if (origin == "child"){
+		//messages <- "test"
+	//}
+    // Implement your logic here to handle the received data
+//}
+
 func writer(pipeFile string, origin string, messages chan string) *os.File {
     // Open the file
-	// if (origin == "child"){
-	// 	fmt.Println(pipeFile)
-	// }
-
     f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
     if err != nil {
         fmt.Printf("Error opening file: %v\n", err)
@@ -278,10 +266,7 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     
     // Continuously wait for messages and write them to the file
 	for msg := range messages {
-		if (origin == "child"){
-			fmt.Println(msg)
-		}
-		//fmt.Println("TEST_2")
+		//fmt.Println("TEST")
 		//fmt.Println(msg)
         _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
         if err != nil {
@@ -318,13 +303,6 @@ func cleanup(messages chan string) {
 }
 
 func killProcess(pid int) error {
-	// Handle SIGINT (Ctrl+C) signal to perform cleanup before exiting
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	
-	// Block until a signal is received
-	<-c
-	
     // Find the process by its PID
     proc, err := os.FindProcess(pid)
     if err != nil {
@@ -459,11 +437,10 @@ func main() {
 
 	//cmd.Stdout = stdoutFile
 	cmd.Stdout = os.Stdout
-	os.Stderr = os.Stderr
 
     cmd.Start()
 
-	go killProcess(cmd.Process.Pid)
+	//go killProcess(cmd.Process.Pid)
     
 	messages := make(chan string)
 	
