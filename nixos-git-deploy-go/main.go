@@ -198,63 +198,60 @@ func keepAlive(f *os.File, origin string) {
 }
 
 
-
-
-func runChildProcess() {
-	unix.Setpgid(0, 0)
-	//var stdout bytes.Buffer
-    // Function to be executed in child process
-	messages := make(chan string, 10000)
-	//f := writer("detach.log", "child")
-	// fmt.Println("TEST")
-	go Reader("recede.log", "child", messages)
-	go writer("detach.log", "child", messages)
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
-	//keepAlive(f, "parent")
-    fmt.Println("Running in child process")
-        // Sleep for 100 seconds
-		//time.Sleep(100 * time.Second)
+func processChildArgs(args []string, messages chan string){
+	//fmt.Println("child: " + strings.Join(args, " "))
+	//fmt.Println(args)
+	//messages <- "test"
+}
+func processParentArgs(args []string, messages chan string){
+	//fmt.Println("parent: " + strings.Join(args, " "))
+	if (args[0] == "watch"){
+		messages <- "responding " + args[1]
+		//fmt.Println("+"+args[1]+"+")
+		go watchChanges(args[1])
+	}
+	//fmt.Println(args)
+	//messages <- "test"
 }
 
 func Reader(pipeFile string, origin string, messages chan string) {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
-        log.Fatalf("Named pipe '%s' does not exist", pipeFile)
+        fmt.Println("Named pipe '%s' does not exist", pipeFile)
     } else if os.IsPermission(err) {
-        log.Fatalf("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
+        fmt.Println("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
     } else if err != nil {
-        log.Fatalf("Error while opening named pipe '%s': %s", pipeFile, err)
+        fmt.Println("Error while opening named pipe '%s': %s", pipeFile, err)
     }
     defer pipe.Close()
 
     // Infinite loop for reading from the named pipe
-    messages <- "We received"
+    //messages <- "We received"
     for {
         // Read from the named pipe
-        data := make([]byte, 1024) // Read buffer size
-        n, err := pipe.Read(data)
-        if err != nil {
-            log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
-        }
-		fmt.Println(string(data[:n]))
+		data := make([]byte, 1024) // Read buffer size
+		n, err := pipe.Read(data)
+		if err != nil {
+			log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
+		}
+		input := strings.TrimSpace(string(data[:n]))
+		args := strings.Split(input, " ")
+		//fmt.Println(args[0])
+		if (args[0] == "child:"){
+			args = args[1:] 
+			//fmt.Println("child message" + args[0])
+			processChildArgs(args, messages)
+		} else if (args[0] == "parent:"){
+			args = args[1:] 
+			//fmt.Println("parent message" + args[0])
+			processParentArgs(args, messages)
+		}
+		//#fmt.Println("data " + string(data[:n]))
         // Process the read data
         //processData(data[:n], origin, messages)
     }
 }
-
-//func processData(data []byte, origin string, messages chan string) {
-    // Process the data read from the named pipe
-   // fmt.Printf("Received data from named pipe: %s\n", string(data))
-
-	//if (origin == "child"){
-		//messages <- "test"
-	//}
-    // Implement your logic here to handle the received data
-//}
 
 func writer(pipeFile string, origin string, messages chan string) *os.File {
     // Open the file
@@ -268,7 +265,8 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
 	for msg := range messages {
 		//fmt.Println("TEST")
 		//fmt.Println(msg)
-        _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg))
+		//fmt.Printf(fmt.Sprintf("%s: %s\n", origin, msg))
+        _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg + "\n"))
         if err != nil {
             fmt.Printf("Error writing to file: %v\n", err)
             break // Break the loop if there's an error
@@ -282,6 +280,35 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     return f
 } 
 
+func runChildProcess() {
+	// defer func() {
+    //     if r := recover(); r != nil {
+    //         fmt.Println("Recovered from panic:", r)
+    //         // Add any cleanup or error handling logic here
+    //     }
+    // }()
+
+	unix.Setpgid(0, 0)
+	//var stdout bytes.Buffer
+    // Function to be executed in child process
+	// messages := make(chan string, 10000)
+	//f := writer("detach.log", "child")
+	// fmt.Println("TEST")
+
+	messages := make(chan string, 10000)
+	 go Reader("recede.log", "child", messages)
+	 go writer("detach.log", "child", messages)
+
+	//for {}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	//keepAlive(f, "parent")
+    fmt.Println("Running in child process")
+        // Sleep for 100 seconds
+		//time.Sleep(100 * time.Second)
+}
 
 func cleanup(messages chan string) {
 	// Handle SIGINT (Ctrl+C) signal to perform cleanup before exiting
@@ -427,21 +454,28 @@ func main() {
 
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
+	// cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	//stdoutFile, err := os.Create("stdout.log")
-	//if err != nil {
-	//	fmt.Println("Error opening stdout.log:", err)
-	//	return
-	//}
-	//defer stdoutFile.Close()
+	// Start the child process
+	// err := cmd.Start()
+	// if err != nil {
+	// 	fmt.Println("Error starting child process:", err)
+	// 	return
+	// }
 
-	//cmd.Stdout = stdoutFile
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-    cmd.Start()
-
+    err = cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting child process:", err)
+		return
+	}
 	//go killProcess(cmd.Process.Pid)
-    
+    	if err != nil {
+		fmt.Println("Error starting child process:", err)
+		return
+	}
 	messages := make(chan string)
 	
 	go cleanup(messages)
@@ -449,10 +483,7 @@ func main() {
 	
 	go writer("recede.log", "parent", messages)
 	go Reader("detach.log", "parent", messages)
-	//go Reader("detach.log")
 
-	//go keepAlive(f, "parent")
-	//fmt.Sscanf("testing", "testing")
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init"}
 
@@ -534,7 +565,7 @@ func main() {
 			filesInput, _ := reader.ReadString('\n')
 			filesInput = strings.TrimSpace(filesInput)
 			files := strings.Split(filesInput, ",")
-
+			//fmt.Println("test")
 			if git, err := git.PlainOpen(gitDirectory); err == nil {
 				go func() {
 					if err := addFilesToGit(files, git); err != nil {
@@ -543,17 +574,18 @@ func main() {
 						fmt.Printf("Added %d file(s) to Git\n", len(files))
 					}
 				}()
-
+				//fmt.Println("sending")
 				// Start file watchers for added files in separate goroutines
 				for _, file := range files {
-					fmt.Println("sending message")
-					messages <- file
+					//fmt.Println("sending message")
+					messages <- "watch " + file
+					//messages <- "test " + file
 					//go watchChanges(file)
 					//_, err := f.WriteString(fmt.Sprintf(file, "parent"))
 					if err != nil {
 						fmt.Println("Error sending message:", err)
 					} 
-					fmt.Println("finished")
+					//fmt.Println("finished")
 				}
 			} else {
 				fmt.Println("Error opening Git repository:", err)
