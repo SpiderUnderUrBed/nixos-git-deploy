@@ -204,7 +204,7 @@ func processChildArgs(args []string, messages chan string){
 	//messages <- "test"
 }
 func processParentArgs(args []string, messages chan string){
-	 //fmt.Println("parent: " + strings.Join(args, " "))
+	 fmt.Println("parent: " + strings.Join(args, " "))
 	if (args[0] == "watch"){
 		messages <- "responding " + args[1]
 		//fmt.Println("+"+args[1]+"+")
@@ -217,10 +217,10 @@ func processParentArgs(args []string, messages chan string){
 		}
 		currentPID := os.Getpid()
 		if currentPID != expectedPID {
-		//	fmt.Printf("Current PID %d does not match expected PID %d. Terminating...\n", currentPID, expectedPID)
+			fmt.Printf("Current PID %d does not match expected PID %d. Terminating...\n", currentPID, expectedPID)
 			os.Exit(1)
 		} else {
-			//fmt.Println("Persist")
+			fmt.Println("Persist")
 		}
 	}
 	//fmt.Println(args)
@@ -618,3 +618,4 @@ func ifDirectoryExists(directory string) bool {
 	_, err := os.Stat(directory)
 	return !os.IsNotExist(err)
 }
+
