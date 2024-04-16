@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"log"
+	//"log"
 	"time"
 	//"syscall"
 	"os/exec"
@@ -219,10 +219,13 @@ func Reader(pipeFile string, origin string, messages chan string) {
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
         fmt.Println("Named pipe '%s' does not exist", pipeFile)
+		return
     } else if os.IsPermission(err) {
         fmt.Println("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
+		return
     } else if err != nil {
         fmt.Println("Error while opening named pipe '%s': %s", pipeFile, err)
+		return
     }
     defer pipe.Close()
 
@@ -233,7 +236,8 @@ func Reader(pipeFile string, origin string, messages chan string) {
 		data := make([]byte, 1024) // Read buffer size
 		n, err := pipe.Read(data)
 		if err != nil {
-			log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
+			fmt.Println("Error reading from named pipe '%s': %s", pipeFile, err)
+			break
 		}
 		input := strings.TrimSpace(string(data[:n]))
 		args := strings.Split(input, " ")
