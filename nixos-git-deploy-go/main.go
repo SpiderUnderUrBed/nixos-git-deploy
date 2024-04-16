@@ -200,32 +200,44 @@ func keepAlive(f *os.File, origin string) {
 
 func processChildArgs(args []string, messages chan string){
 	//fmt.Println("child: " + strings.Join(args, " "))
-	//fmt.Println(args)
+	// fmt.Println(args)
 	//messages <- "test"
 }
 func processParentArgs(args []string, messages chan string){
-	//fmt.Println("parent: " + strings.Join(args, " "))
+	// fmt.Println("parent: " + strings.Join(args, " "))
 	if (args[0] == "watch"){
 		messages <- "responding " + args[1]
 		//fmt.Println("+"+args[1]+"+")
 		go watchChanges(args[1])
+	} else if args[0] == "new" {
+		expectedPID, err := strconv.Atoi(args[1])
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		currentPID := os.Getpid()
+		if currentPID != expectedPID {
+			fmt.Printf("Current PID %d does not match expected PID %d. Terminating...\n", currentPID, expectedPID)
+			os.Exit(1)
+		}
 	}
 	//fmt.Println(args)
 	//messages <- "test"
 }
 
 func Reader(pipeFile string, origin string, messages chan string) {
+	for {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
         fmt.Println("Named pipe '%s' does not exist", pipeFile)
-		return
+		continue
     } else if os.IsPermission(err) {
         fmt.Println("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
-		return
+		continue
     } else if err != nil {
         fmt.Println("Error while opening named pipe '%s': %s", pipeFile, err)
-		return
+		continue
     }
     defer pipe.Close()
 
@@ -236,7 +248,7 @@ func Reader(pipeFile string, origin string, messages chan string) {
 		data := make([]byte, 1024) // Read buffer size
 		n, err := pipe.Read(data)
 		if err != nil {
-			fmt.Println("Error reading from named pipe '%s': %s", pipeFile, err)
+			//fmt.Println("Error reading from named pipe '%s': %s", pipeFile, err)
 			break
 		}
 		input := strings.TrimSpace(string(data[:n]))
@@ -254,7 +266,8 @@ func Reader(pipeFile string, origin string, messages chan string) {
 		//#fmt.Println("data " + string(data[:n]))
         // Process the read data
         //processData(data[:n], origin, messages)
-    }
+    	}
+	}
 }
 
 func writer(pipeFile string, origin string, messages chan string) *os.File {
@@ -285,24 +298,15 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
 } 
 
 func runChildProcess() {
-	// defer func() {
-    //     if r := recover(); r != nil {
-    //         fmt.Println("Recovered from panic:", r)
-    //         // Add any cleanup or error handling logic here
-    //     }
-    // }()
-
 	unix.Setpgid(0, 0)
-	//var stdout bytes.Buffer
-    // Function to be executed in child process
-	// messages := make(chan string, 10000)
-	//f := writer("detach.log", "child")
-	// fmt.Println("TEST")
+
 
 	messages := make(chan string, 10000)
-	 go Reader("recede.log", "child", messages)
-	 go writer("detach.log", "child", messages)
+	go Reader("recede.log", "child", messages)
+	//go preprocessReader("recede.log", "child", messages)
+	go writer("detach.log", "child", messages)
 
+	 //fmt.Println("EXITING")
 	//for {}
 
 	c := make(chan os.Signal, 1)
@@ -467,8 +471,8 @@ func main() {
 	// 	return
 	// }
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 
     err = cmd.Start()
 	if err != nil {
@@ -487,6 +491,8 @@ func main() {
 	
 	go writer("recede.log", "parent", messages)
 	go Reader("detach.log", "parent", messages)
+
+	messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init"}
