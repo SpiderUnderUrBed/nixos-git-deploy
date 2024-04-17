@@ -10,16 +10,18 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"log"
+	// "log"
 	"time"
 	//"syscall"
 	"os/exec"
 	"strconv"
 	"encoding/json"
-	"bytes"
+	// "bytes"
 
-	"filippo.io/age"
-	"filippo.io/age/armor"
+	"nixos-git-deploy-go/lib"
+
+	// "filippo.io/age"
+	// "filippo.io/age/armor"
 	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
@@ -122,6 +124,7 @@ func addFilesToGit(files []string, r *git.Repository) error {
 // Function to watch for file changes
 func watchChanges(filename string) {
 	// Check if the file is already being watched
+	fmt.Println(filename)
 	if _, ok := watchedFiles[filename]; ok {
 		fmt.Printf("File %s is already being watched\n", filename)
 		return
@@ -155,7 +158,7 @@ func watchChanges(filename string) {
 				//fmt.Printf("File %s has been modified\n", filename)
 				err := modifyFile(filename)
 				if err != nil {
-					fmt.Println("ERROR:", err)
+					//fmt.Println("ERROR:", err)
 				}
 			}
 		case err, ok := <-watcher.Errors:
@@ -204,6 +207,7 @@ func keepAlive(f *os.File, origin string) {
 
 
 func processChildArgs(args []string, messages chan string){
+	fmt.Println(args)
 }
 func processParentArgs(args []string, messages chan string){
 	//fmt.Println("parent: " + strings.Join(args, " "))
@@ -299,6 +303,8 @@ func runChildProcess() {
 
 	unix.Setpgid(0, 0)
 
+	//fmt.Println("STARTED CHILD PROCESS")
+
 	 configFile := Config{
 		UserAllowed: "y",
 		FirstTime:   "y",
@@ -343,11 +349,31 @@ func runChildProcess() {
 		fmt.Println("Error unmarshalling JSON:", err)
 		return
 	}
-
+	//fmt.Println("survived here")
+	//fmt.Println(len(settings.FilesToWatch))
 	for i := 0; i < len(settings.FilesToWatch); i++ {
-		watchChanges(settings.FilesToWatch[i])
-		//fmt.Println(settings.FilesToWatch[i])
-    }
+		// Check if the file exists
+		if _, err := os.Stat(settings.FilesToWatch[i]); os.IsNotExist(err) {
+			//fmt.Printf("File %s does not exist. Removing from settings.\n", settings.FilesToWatch[i])
+			// Remove the file from settings
+			settings.FilesToWatch = append(settings.FilesToWatch[:i], settings.FilesToWatch[i+1:]...)
+			//continue // Skip to the next iteration
+		}
+	
+		// Start watching the file in a goroutine
+		go watchChanges(settings.FilesToWatch[i])
+	}
+	//fmt.Println(settings.FilesToWatch)
+	jsonData, err := json.Marshal(settings)
+	//fmt.Println(jsonData)
+	if err != nil {
+		fmt.Println("Error with JSON:", err)
+	}
+
+	err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+	if err != nil {
+		fmt.Println("Error with file:", err)
+	}
 
 	messages := make(chan string, 10000)
 	go Reader("recede.log", "child", messages, settings)
@@ -399,109 +425,6 @@ func killProcess(pid int) error {
 
     return nil
 }
-func Decrypt(){
-	identityBytes, err := os.ReadFile("privatekey.txt")
-	if err != nil {
-		log.Fatalf("Failed to read identity file: %v", err)
-	}
-	receiver, err := age.ParseX25519Identity(string(identityBytes))
-	if err != nil {
-		log.Fatalf("Failed to parse X25519 identity: %v", err)
-	}
-
-	// Read the encrypted file and decrypt the message
-	encryptedBytes, err := os.ReadFile("encrypted.txt")
-	if err != nil {
-		log.Fatalf("Failed to read encrypted file: %v", err)
-	}
-	armorReader := armor.NewReader(bytes.NewReader(encryptedBytes))
-	r, err := age.Decrypt(armorReader, receiver)
-	if err != nil {
-		log.Fatalf("Failed to decrypt message: %v", err)
-	}
-	//defer r.Close()
-
-	// Write the decrypted message to stdout
-	_, err = io.Copy(os.Stdout, r)
-	if err != nil {
-		log.Fatalf("Failed to write decrypted message: %v", err)
-	}
-	fmt.Println()
-}
-func Encrypt() {
-	msg := "Hello"
-
-	// Check if the private key file exists
-	privateKeyFile := "privatekey.txt"
-	privateKey, err := ioutil.ReadFile(privateKeyFile)
-	if err != nil {
-		fmt.Println("Not using keyfile")
-		if !os.IsNotExist(err) {
-			log.Fatalf("Failed to read private key file: %v", err)
-		}
-
-		// Generate X25519 identity if private key file does not exist
-		identity, err := age.GenerateX25519Identity()
-		if err != nil {
-			log.Fatalf("Failed to generate X25519 identity: %v", err)
-		}
-		privateKey = []byte(identity.String())
-
-		// Save the private key to a file
-		if err := ioutil.WriteFile(privateKeyFile, privateKey, 0644); err != nil {
-			log.Fatalf("Failed to write private key to file: %v", err)
-		}
-	} else {
-		fmt.Println("Using keyfile")
-	}
-
-	// Check if the public key file exists
-	publicKeyFile := "publickey.txt"
-	publicKey, err := ioutil.ReadFile(publicKeyFile)
-	if err != nil {
-		fmt.Println("Not using keyfile")
-		if !os.IsNotExist(err) {
-			log.Fatalf("Failed to read public key file: %v", err)
-		}
-
-		// Generate X25519 identity if public key file does not exist
-		identity, err := age.GenerateX25519Identity()
-		if err != nil {
-			log.Fatalf("Failed to generate X25519 identity: %v", err)
-		}
-		publicKey = []byte(identity.Recipient().String())
-
-		// Save the public key to a file
-		if err := ioutil.WriteFile(publicKeyFile, publicKey, 0644); err != nil {
-			log.Fatalf("Failed to write public key to file: %v", err)
-		}
-	} else {
-		fmt.Println("Using keyfile")
-	}
-
-	// Create an encrypted file
-	encryptedFile, err := os.Create("encrypted.txt")
-	if err != nil {
-		log.Fatalf("Failed to create encrypted file: %v", err)
-	}
-	defer encryptedFile.Close()
-
-	// Encrypt the message and write to the encrypted file
-	armorWriter := armor.NewWriter(encryptedFile)
-	recipient, err := age.ParseX25519Recipient(string(publicKey))
-	if err != nil {
-		log.Fatalf("Failed to parse recipient public key: %v", err)
-	}
-	w, err := age.Encrypt(armorWriter, recipient)
-	if err != nil {
-		log.Fatalf("Failed to create encryption writer: %v", err)
-	}
-	if _, err := io.WriteString(w, msg); err != nil {
-		log.Fatalf("Failed to write to encrypted file: %v", err)
-	}
-	w.Close()
-	armorWriter.Close()
-}
 
 
 
@@ -515,8 +438,10 @@ func main() {
     }
 
 	reader := bufio.NewReader(os.Stdin)
-	Encrypt()
-	Decrypt()
+	aged.Encrypt()
+	aged.Decrypt()
+	// Encrypt()
+	// Decrypt()
 
 	// Read the identity from the file
 
@@ -649,7 +574,7 @@ func main() {
 	go Reader("detach.log", "parent", messages, settings)
 
 	for {
-		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init", "age"}
+		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init", "age", "destination"}
 
 		fmt.Println("What do you want to do?")
 		for i, option := range options {
@@ -730,6 +655,7 @@ func main() {
 			for _, remote := range remotes {
 				fmt.Printf("Name: %s, URLs: %v\n", remote.Config().Name, remote.Config().URLs)
 			}
+		case "destination":
 		
 		case "age":
 
@@ -739,6 +665,27 @@ func main() {
 			// Add your logic for "remove" here
 		case "upgrade":
 			// Add your logic for "upgrade" here
+		case "add":
+			// Add your logic for "add" here
+			fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
+			filesInput, _ := reader.ReadString('\n')
+			filesInput = strings.TrimSpace(filesInput)
+			files := strings.Split(filesInput, ",")
+		
+			if git, err := git.PlainOpen(gitDirectory); err == nil {
+				go func() {
+					if err := addFilesToGit(files, git); err != nil {
+						fmt.Println("Error adding files to Git:", err)
+					} else {
+						//fmt.Printf("Added %d file(s) to Git\n", len(files))
+					}
+				}()
+			}
+		
+			for _, file := range files {
+				modifyFile(file)
+			}
+		
 		case "status":
 			// Add your logic for "status" here
 		case "add-automatic":
