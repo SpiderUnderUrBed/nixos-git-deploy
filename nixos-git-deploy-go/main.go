@@ -291,8 +291,8 @@ func main() {
     }
 
 	reader := bufio.NewReader(os.Stdin)
-	aged.Encrypt()
-	aged.Decrypt()
+	// aged.Encrypt()
+	// aged.Decrypt()
 	// Encrypt()
 	// Decrypt()
 
@@ -513,7 +513,19 @@ func main() {
 		case "destination":
 		
 		case "age":
-
+			// aged.Encrypt()
+			// aged.Decrypt()
+			fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
+			filesInput, _ := reader.ReadString('\n')
+			filesInput = strings.TrimSpace(filesInput)
+			files := strings.Split(filesInput, ",")
+			for _, file := range files {
+				aged.Encrypt(file)
+				aged.Decrypt(file)
+			}
+			// if git, err := git.PlainOpen(gitDirectory); err == nil {
+				
+			// }
 		case "apply":
 			// Add your logic for "apply" here
 		case "remove":

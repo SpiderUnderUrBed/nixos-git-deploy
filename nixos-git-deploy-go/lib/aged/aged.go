@@ -12,7 +12,7 @@ import (
 	"filippo.io/age/armor"
 )
 
-func Decrypt() {
+func Decrypt(filename string) {
 	identityBytes, err := os.ReadFile("privatekey.txt")
 	if err != nil {
 		log.Fatalf("Failed to read identity file: %v", err)
@@ -23,7 +23,7 @@ func Decrypt() {
 	}
 
 	// Read the encrypted file and decrypt the message
-	encryptedBytes, err := os.ReadFile("encrypted.txt")
+	encryptedBytes, err := os.ReadFile(filename + ".encrypted")
 	if err != nil {
 		log.Fatalf("Failed to read encrypted file: %v", err)
 	}
@@ -41,8 +41,13 @@ func Decrypt() {
 	fmt.Println()
 }
 
-func Encrypt() {
-	msg := "Hello"
+func Encrypt(filename string) {
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		fmt.Println(err)
+		//return err
+	}
+	msg := string(content)	
 
 	// Check if the private key file exists
 	privateKeyFile := "privatekey.txt"
@@ -93,7 +98,7 @@ func Encrypt() {
 	}
 
 	// Create an encrypted file
-	encryptedFile, err := os.Create("encrypted.txt")
+	encryptedFile, err := os.Create(filename + ".encrypted")
 	if err != nil {
 		log.Fatalf("Failed to create encrypted file: %v", err)
 	}
