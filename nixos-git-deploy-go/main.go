@@ -399,57 +399,8 @@ func killProcess(pid int) error {
 
     return nil
 }
-func main() {
-    
-    //Check if there are any command-line arguments
-    if len(os.Args) > 1 && os.Args[1] == "child" {
-        // This is the child process
-        runChildProcess()
-        return
-    }
-
-	reader := bufio.NewReader(os.Stdin)
-	msg := "Hello"
-
-	// Generate X25519 identity
-	identity, err := age.GenerateX25519Identity()
-	if err != nil {
-		log.Fatalf("Failed to generate X25519 identity: %v", err)
-	}
-	//publicKey := identity.Recipient().String()
-	privateKey := identity.String()
-
-	// Write the identity to a file
-	identityFile, err := os.Create("identity.txt")
-	if err != nil {
-		log.Fatalf("Failed to create identity file: %v", err)
-	}
-	defer identityFile.Close()
-	if _, err := identityFile.WriteString(privateKey); err != nil {
-		log.Fatalf("Failed to write identity to file: %v", err)
-	}
-
-	// Create an encrypted file
-	encryptedFile, err := os.Create("encrypted.txt")
-	if err != nil {
-		log.Fatalf("Failed to create encrypted file: %v", err)
-	}
-	defer encryptedFile.Close()
-
-	// Encrypt the message and write to the encrypted file
-	armorWriter := armor.NewWriter(encryptedFile)
-	w, err := age.Encrypt(armorWriter, identity.Recipient())
-	if err != nil {
-		log.Fatalf("Failed to create encryption writer: %v", err)
-	}
-	if _, err := io.WriteString(w, msg); err != nil {
-		log.Fatalf("Failed to write to encrypted file: %v", err)
-	}
-	w.Close()
-	armorWriter.Close()
-
-	// Read the identity from the file
-	identityBytes, err := os.ReadFile("identity.txt")
+func Decrypt(){
+	identityBytes, err := os.ReadFile("privatekey.txt")
 	if err != nil {
 		log.Fatalf("Failed to read identity file: %v", err)
 	}
@@ -476,6 +427,99 @@ func main() {
 		log.Fatalf("Failed to write decrypted message: %v", err)
 	}
 	fmt.Println()
+}
+func Encrypt() {
+	msg := "Hello"
+
+	// Check if the private key file exists
+	privateKeyFile := "privatekey.txt"
+	privateKey, err := ioutil.ReadFile(privateKeyFile)
+	if err != nil {
+		fmt.Println("Not using keyfile")
+		if !os.IsNotExist(err) {
+			log.Fatalf("Failed to read private key file: %v", err)
+		}
+
+		// Generate X25519 identity if private key file does not exist
+		identity, err := age.GenerateX25519Identity()
+		if err != nil {
+			log.Fatalf("Failed to generate X25519 identity: %v", err)
+		}
+		privateKey = []byte(identity.String())
+
+		// Save the private key to a file
+		if err := ioutil.WriteFile(privateKeyFile, privateKey, 0644); err != nil {
+			log.Fatalf("Failed to write private key to file: %v", err)
+		}
+	} else {
+		fmt.Println("Using keyfile")
+	}
+
+	// Check if the public key file exists
+	publicKeyFile := "publickey.txt"
+	publicKey, err := ioutil.ReadFile(publicKeyFile)
+	if err != nil {
+		fmt.Println("Not using keyfile")
+		if !os.IsNotExist(err) {
+			log.Fatalf("Failed to read public key file: %v", err)
+		}
+
+		// Generate X25519 identity if public key file does not exist
+		identity, err := age.GenerateX25519Identity()
+		if err != nil {
+			log.Fatalf("Failed to generate X25519 identity: %v", err)
+		}
+		publicKey = []byte(identity.Recipient().String())
+
+		// Save the public key to a file
+		if err := ioutil.WriteFile(publicKeyFile, publicKey, 0644); err != nil {
+			log.Fatalf("Failed to write public key to file: %v", err)
+		}
+	} else {
+		fmt.Println("Using keyfile")
+	}
+
+	// Create an encrypted file
+	encryptedFile, err := os.Create("encrypted.txt")
+	if err != nil {
+		log.Fatalf("Failed to create encrypted file: %v", err)
+	}
+	defer encryptedFile.Close()
+
+	// Encrypt the message and write to the encrypted file
+	armorWriter := armor.NewWriter(encryptedFile)
+	recipient, err := age.ParseX25519Recipient(string(publicKey))
+	if err != nil {
+		log.Fatalf("Failed to parse recipient public key: %v", err)
+	}
+	w, err := age.Encrypt(armorWriter, recipient)
+	if err != nil {
+		log.Fatalf("Failed to create encryption writer: %v", err)
+	}
+	if _, err := io.WriteString(w, msg); err != nil {
+		log.Fatalf("Failed to write to encrypted file: %v", err)
+	}
+	w.Close()
+	armorWriter.Close()
+}
+
+
+
+func main() {
+    
+    //Check if there are any command-line arguments
+    if len(os.Args) > 1 && os.Args[1] == "child" {
+        // This is the child process
+        runChildProcess()
+        return
+    }
+
+	reader := bufio.NewReader(os.Stdin)
+	Encrypt()
+	Decrypt()
+
+	// Read the identity from the file
+
 	// privateKey, err := age.GenerateX25519Identity()
 	// if err != nil {
 	// 	fmt.Println(err)
