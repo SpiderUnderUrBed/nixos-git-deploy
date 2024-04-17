@@ -16,6 +16,10 @@ import (
 	"os/exec"
 	"strconv"
 	"encoding/json"
+	"bytes"
+
+	"filippo.io/age"
+	"filippo.io/age/armor"
 	"golang.org/x/sys/unix"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
@@ -28,6 +32,7 @@ var watchedFiles = make(map[string]bool)
 type Config struct {
 	UserAllowed string `json:"UserAllowed"`
 	FirstTime   string `json:"FirstTime"`
+	FilesToWatch []string `json:"filesToWatch"`
 }
 
 // type Settings struct {
@@ -139,7 +144,7 @@ func watchChanges(filename string) {
 	watchedFiles[filename] = true
 
 	// Start watching for events
-	fmt.Printf("Watching for changes in file: %s\n", filename)
+	//fmt.Printf("Watching for changes in file: %s\n", filename)
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -199,61 +204,74 @@ func keepAlive(f *os.File, origin string) {
 
 
 func processChildArgs(args []string, messages chan string){
-	//fmt.Println("child: " + strings.Join(args, " "))
-	//fmt.Println(args)
-	//messages <- "test"
 }
 func processParentArgs(args []string, messages chan string){
 	//fmt.Println("parent: " + strings.Join(args, " "))
-	if (args[0] == "watch"){
-		messages <- "responding " + args[1]
-		//fmt.Println("+"+args[1]+"+")
-		go watchChanges(args[1])
-	}
+		if (args[0] == "watch"){
+			messages <- "responding " + args[1]
+			//fmt.Println("+"+args[1]+"+")
+			go watchChanges(args[1])
+		} else if args[0] == "new" {
+			expectedPID, err := strconv.Atoi(args[1])
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+			currentPID := os.Getpid()
+			if currentPID != expectedPID {
+				//fmt.Printf("Current PID %d does not match expected PID %d. Terminating...\n", currentPID, expectedPID)
+				os.Exit(1)
+			} else {
+				//fmt.Println("Persist")
+			}
+		}
 	//fmt.Println(args)
 	//messages <- "test"
 }
 
-func Reader(pipeFile string, origin string, messages chan string) {
+func Reader(pipeFile string, origin string, messages chan string, settings Config) {
+	for {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
     if os.IsNotExist(err) {
         fmt.Println("Named pipe '%s' does not exist", pipeFile)
+		continue
     } else if os.IsPermission(err) {
         fmt.Println("Insufficient permissions to read named pipe '%s': %s", pipeFile, err)
+		continue
     } else if err != nil {
         fmt.Println("Error while opening named pipe '%s': %s", pipeFile, err)
+		continue
     }
     defer pipe.Close()
 
     // Infinite loop for reading from the named pipe
     //messages <- "We received"
-    for {
-        // Read from the named pipe
-		data := make([]byte, 1024) // Read buffer size
-		n, err := pipe.Read(data)
-		if err != nil {
-			log.Fatalf("Error reading from named pipe '%s': %s", pipeFile, err)
-		}
-		input := strings.TrimSpace(string(data[:n]))
-		args := strings.Split(input, " ")
-		//fmt.Println(args[0])
-		if (args[0] == "child:"){
-			args = args[1:] 
-			//fmt.Println("child message" + args[0])
-			processChildArgs(args, messages)
-		} else if (args[0] == "parent:"){
-			args = args[1:] 
-			//fmt.Println("parent message" + args[0])
-			processParentArgs(args, messages)
-		}
-		//#fmt.Println("data " + string(data[:n]))
-        // Process the read data
-        //processData(data[:n], origin, messages)
-    }
+		for {
+			// Read from the named pipe
+			data := make([]byte, 1024) // Read buffer size
+			n, err := pipe.Read(data)
+			if err != nil {
+				//fmt.Println("Error reading from named pipe '%s': %s", pipeFile, err)
+				break
+			}
+			input := strings.TrimSpace(string(data[:n]))
+			args := strings.Split(input, " ")
+			//fmt.Println(args[0])
+			if (args[0] == "child:"){
+				args = args[1:] 
+				//fmt.Println("child message" + args[0])
+				processChildArgs(args, messages)
+			} else if (args[0] == "parent:"){
+				args = args[1:] 
+				//fmt.Println("parent message" + args[0])
+				processParentArgs(args, messages)
+			}
+    	}
+	}
 }
 
-func writer(pipeFile string, origin string, messages chan string) *os.File {
+func writer(pipeFile string, origin string, messages chan string, settings Config) *os.File {
     // Open the file
     f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
     if err != nil {
@@ -263,9 +281,6 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
     
     // Continuously wait for messages and write them to the file
 	for msg := range messages {
-		//fmt.Println("TEST")
-		//fmt.Println(msg)
-		//fmt.Printf(fmt.Sprintf("%s: %s\n", origin, msg))
         _, err := f.WriteString(fmt.Sprintf("%s: %s\n", origin, msg + "\n"))
         if err != nil {
             fmt.Printf("Error writing to file: %v\n", err)
@@ -281,33 +296,68 @@ func writer(pipeFile string, origin string, messages chan string) *os.File {
 } 
 
 func runChildProcess() {
-	// defer func() {
-    //     if r := recover(); r != nil {
-    //         fmt.Println("Recovered from panic:", r)
-    //         // Add any cleanup or error handling logic here
-    //     }
-    // }()
 
 	unix.Setpgid(0, 0)
-	//var stdout bytes.Buffer
-    // Function to be executed in child process
-	// messages := make(chan string, 10000)
-	//f := writer("detach.log", "child")
-	// fmt.Println("TEST")
+
+	 configFile := Config{
+		UserAllowed: "y",
+		FirstTime:   "y",
+		FilesToWatch: nil,
+	}
+
+	rawConfig, err := os.Open("./config.json")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer rawConfig.Close()
+
+	formattedConfig, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+
+	err = json.Unmarshal(formattedConfig, &configFile)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return
+	}
+
+	// Reset file cursor to beginning
+	_, err = rawConfig.Seek(0, 0)
+	if err != nil {
+		fmt.Println("Error seeking file:", err)
+		return
+	}
+
+	fomated_config, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+
+	var settings Config
+	err = json.Unmarshal(fomated_config, &settings)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return
+	}
+
+	for i := 0; i < len(settings.FilesToWatch); i++ {
+		watchChanges(settings.FilesToWatch[i])
+		//fmt.Println(settings.FilesToWatch[i])
+    }
 
 	messages := make(chan string, 10000)
-	 go Reader("recede.log", "child", messages)
-	 go writer("detach.log", "child", messages)
+	go Reader("recede.log", "child", messages, settings)
+	go writer("detach.log", "child", messages, settings)
 
-	//for {}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
-	//keepAlive(f, "parent")
-    fmt.Println("Running in child process")
-        // Sleep for 100 seconds
-		//time.Sleep(100 * time.Second)
+    fmt.Println("Exited")
 }
 
 func cleanup(messages chan string) {
@@ -359,52 +409,125 @@ func main() {
     }
 
 	reader := bufio.NewReader(os.Stdin)
+	msg := "Hello"
 
+	// Generate X25519 identity
+	identity, err := age.GenerateX25519Identity()
+	if err != nil {
+		log.Fatalf("Failed to generate X25519 identity: %v", err)
+	}
+	//publicKey := identity.Recipient().String()
+	privateKey := identity.String()
+
+	// Write the identity to a file
+	identityFile, err := os.Create("identity.txt")
+	if err != nil {
+		log.Fatalf("Failed to create identity file: %v", err)
+	}
+	defer identityFile.Close()
+	if _, err := identityFile.WriteString(privateKey); err != nil {
+		log.Fatalf("Failed to write identity to file: %v", err)
+	}
+
+	// Create an encrypted file
+	encryptedFile, err := os.Create("encrypted.txt")
+	if err != nil {
+		log.Fatalf("Failed to create encrypted file: %v", err)
+	}
+	defer encryptedFile.Close()
+
+	// Encrypt the message and write to the encrypted file
+	armorWriter := armor.NewWriter(encryptedFile)
+	w, err := age.Encrypt(armorWriter, identity.Recipient())
+	if err != nil {
+		log.Fatalf("Failed to create encryption writer: %v", err)
+	}
+	if _, err := io.WriteString(w, msg); err != nil {
+		log.Fatalf("Failed to write to encrypted file: %v", err)
+	}
+	w.Close()
+	armorWriter.Close()
+
+	// Read the identity from the file
+	identityBytes, err := os.ReadFile("identity.txt")
+	if err != nil {
+		log.Fatalf("Failed to read identity file: %v", err)
+	}
+	receiver, err := age.ParseX25519Identity(string(identityBytes))
+	if err != nil {
+		log.Fatalf("Failed to parse X25519 identity: %v", err)
+	}
+
+	// Read the encrypted file and decrypt the message
+	encryptedBytes, err := os.ReadFile("encrypted.txt")
+	if err != nil {
+		log.Fatalf("Failed to read encrypted file: %v", err)
+	}
+	armorReader := armor.NewReader(bytes.NewReader(encryptedBytes))
+	r, err := age.Decrypt(armorReader, receiver)
+	if err != nil {
+		log.Fatalf("Failed to decrypt message: %v", err)
+	}
+	//defer r.Close()
+
+	// Write the decrypted message to stdout
+	_, err = io.Copy(os.Stdout, r)
+	if err != nil {
+		log.Fatalf("Failed to write decrypted message: %v", err)
+	}
+	fmt.Println()
+	// privateKey, err := age.GenerateX25519Identity()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	//log.Fatalf("internal error: %v", err)
+	// }
+	// publicKey := privateKey.Recipient()
 	//type Settings struc {
 
-		configFile := Config{
-			UserAllowed: "y",
-			FirstTime:   "y",
-		}
+	configFile := Config{
+		UserAllowed: "y",
+		FirstTime:   "y",
+		FilesToWatch: nil,
+	}
 	
-		rawConfig, err := os.Open("./config.json")
-		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return
-		}
-		defer rawConfig.Close()
+	rawConfig, err := os.Open("./config.json")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer rawConfig.Close()
 
-		formattedConfig, err := ioutil.ReadAll(rawConfig)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-			return
-		}
+	formattedConfig, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
 	
-		err = json.Unmarshal(formattedConfig, &configFile)
-		if err != nil {
-			fmt.Println("Error unmarshalling JSON:", err)
-			return
-		}
+	err = json.Unmarshal(formattedConfig, &configFile)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return
+	}
 	
-		// Reset file cursor to beginning
-		_, err = rawConfig.Seek(0, 0)
-		if err != nil {
-			fmt.Println("Error seeking file:", err)
-			return
-		}
+	// Reset file cursor to beginning
+	_, err = rawConfig.Seek(0, 0)
+	if err != nil {
+		fmt.Println("Error seeking file:", err)
+		return
+	}
 	
-		fomated_config, err := ioutil.ReadAll(rawConfig)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-			return
-		}
+	fomated_config, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
 	
-		var settings Config
-		err = json.Unmarshal(fomated_config, &settings)
-		if err != nil {
-			fmt.Println("Error unmarshalling JSON:", err)
-			return
-		}
+	var settings Config
+	err = json.Unmarshal(fomated_config, &settings)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return
+	}
 	
 		//fmt.Println(settings)
 	//fmt.Print(settings)
@@ -454,14 +577,6 @@ func main() {
 
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
-	// cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-
-	// Start the child process
-	// err := cmd.Start()
-	// if err != nil {
-	// 	fmt.Println("Error starting child process:", err)
-	// 	return
-	// }
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -477,22 +592,27 @@ func main() {
 		return
 	}
 	messages := make(chan string)
-	
+
 	go cleanup(messages)
 	fmt.Println(strconv.Itoa(cmd.Process.Pid))
 	
-	go writer("recede.log", "parent", messages)
-	go Reader("detach.log", "parent", messages)
+	go func() {
+		messages <- "new " + strconv.Itoa(cmd.Process.Pid)
+	}()
+	
+
+	go writer("recede.log", "parent", messages, settings)
+	go Reader("detach.log", "parent", messages, settings)
 
 	for {
-		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init"}
+		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init", "age"}
 
 		fmt.Println("What do you want to do?")
 		for i, option := range options {
 			fmt.Printf("%d. %s\n", i+1, option)
 		}
 
-		fmt.Print("Enter your choice (1-8): ")
+		fmt.Print("Enter your choice (1-9): ")
 		choice, _ := reader.ReadString('\n')
 		choice = strings.TrimSpace(choice)
 		index := -1
@@ -542,15 +662,33 @@ func main() {
 				Name: "origin",
 				URLs: []string{remote},
 			}
-			err = r.DeleteRemote("origin")
-			if err != nil {
+			
+			// Delete the remote if it exists
+			if err := r.DeleteRemote("origin"); err != nil && err != git.ErrRemoteNotFound {
 				fmt.Println("Error deleting remote:", err)
 				continue
 			}
+			
+			// Create the new remote
 			_, err = r.CreateRemote(remoteConf)
 			if err != nil {
 				fmt.Println("Error adding remote:", err)
+				continue
 			}
+		
+			// Print the remotes after adding or modifying them
+			remotes, err := r.Remotes()
+			if err != nil {
+				fmt.Println("Error getting remotes:", err)
+				continue
+			}
+			fmt.Println("Remotes:")
+			for _, remote := range remotes {
+				fmt.Printf("Name: %s, URLs: %v\n", remote.Config().Name, remote.Config().URLs)
+			}
+		
+		case "age":
+
 		case "apply":
 			// Add your logic for "apply" here
 		case "remove":
@@ -571,22 +709,32 @@ func main() {
 					if err := addFilesToGit(files, git); err != nil {
 						fmt.Println("Error adding files to Git:", err)
 					} else {
-						fmt.Printf("Added %d file(s) to Git\n", len(files))
+						//fmt.Printf("Added %d file(s) to Git\n", len(files))
 					}
 				}()
 				//fmt.Println("sending")
 				// Start file watchers for added files in separate goroutines
 				for _, file := range files {
-					//fmt.Println("sending message")
+					// Append the file to the configFile's FilesToWatch slice
+					configFile.FilesToWatch = append(configFile.FilesToWatch, file)
+					jsonData, err := json.Marshal(configFile)
+					//fmt.Println(jsonData)
+					if err != nil {
+						fmt.Println("Error with JSON:", err)
+					}
+			
+					err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+					if err != nil {
+						fmt.Println("Error with file:", err)
+					}
+					// Send the watch message to the channel
 					messages <- "watch " + file
-					//messages <- "test " + file
-					//go watchChanges(file)
-					//_, err := f.WriteString(fmt.Sprintf(file, "parent"))
+					
+					// Handle errors if any
 					if err != nil {
 						fmt.Println("Error sending message:", err)
-					} 
-					//fmt.Println("finished")
-				}
+					}
+				}				
 			} else {
 				fmt.Println("Error opening Git repository:", err)
 			}
