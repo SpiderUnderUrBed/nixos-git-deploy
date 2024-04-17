@@ -10,7 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+<<<<<<< HEAD
 	// "log"
+=======
+	//"log"
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
 	"time"
 	//"syscall"
 	"os/exec"
@@ -207,6 +211,7 @@ func keepAlive(f *os.File, origin string) {
 
 
 func processChildArgs(args []string, messages chan string){
+<<<<<<< HEAD
 	fmt.Println(args)
 }
 func processParentArgs(args []string, messages chan string){
@@ -229,11 +234,39 @@ func processParentArgs(args []string, messages chan string){
 				//fmt.Println("Persist")
 			}
 		}
+=======
+	//fmt.Println("child: " + strings.Join(args, " "))
+	// fmt.Println(args)
+	//messages <- "test"
+}
+func processParentArgs(args []string, messages chan string){
+	// fmt.Println("parent: " + strings.Join(args, " "))
+	if (args[0] == "watch"){
+		messages <- "responding " + args[1]
+		//fmt.Println("+"+args[1]+"+")
+		go watchChanges(args[1])
+	} else if args[0] == "new" {
+		expectedPID, err := strconv.Atoi(args[1])
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		currentPID := os.Getpid()
+		if currentPID != expectedPID {
+			fmt.Printf("Current PID %d does not match expected PID %d. Terminating...\n", currentPID, expectedPID)
+			os.Exit(1)
+		}
+	}
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
 	//fmt.Println(args)
 	//messages <- "test"
 }
 
+<<<<<<< HEAD
 func Reader(pipeFile string, origin string, messages chan string, settings Config) {
+=======
+func Reader(pipeFile string, origin string, messages chan string) {
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
 	for {
     // Open the named pipe for reading
     pipe, err := os.Open(pipeFile)
@@ -251,6 +284,7 @@ func Reader(pipeFile string, origin string, messages chan string, settings Confi
 
     // Infinite loop for reading from the named pipe
     //messages <- "We received"
+<<<<<<< HEAD
 		for {
 			// Read from the named pipe
 			data := make([]byte, 1024) // Read buffer size
@@ -271,6 +305,31 @@ func Reader(pipeFile string, origin string, messages chan string, settings Confi
 				//fmt.Println("parent message" + args[0])
 				processParentArgs(args, messages)
 			}
+=======
+    for {
+        // Read from the named pipe
+		data := make([]byte, 1024) // Read buffer size
+		n, err := pipe.Read(data)
+		if err != nil {
+			//fmt.Println("Error reading from named pipe '%s': %s", pipeFile, err)
+			break
+		}
+		input := strings.TrimSpace(string(data[:n]))
+		args := strings.Split(input, " ")
+		//fmt.Println(args[0])
+		if (args[0] == "child:"){
+			args = args[1:] 
+			//fmt.Println("child message" + args[0])
+			processChildArgs(args, messages)
+		} else if (args[0] == "parent:"){
+			args = args[1:] 
+			//fmt.Println("parent message" + args[0])
+			processParentArgs(args, messages)
+		}
+		//#fmt.Println("data " + string(data[:n]))
+        // Process the read data
+        //processData(data[:n], origin, messages)
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
     	}
 	}
 }
@@ -300,6 +359,7 @@ func writer(pipeFile string, origin string, messages chan string, settings Confi
 } 
 
 func runChildProcess() {
+<<<<<<< HEAD
 
 	unix.Setpgid(0, 0)
 
@@ -379,6 +439,18 @@ func runChildProcess() {
 	go Reader("recede.log", "child", messages, settings)
 	go writer("detach.log", "child", messages, settings)
 
+=======
+	unix.Setpgid(0, 0)
+
+
+	messages := make(chan string, 10000)
+	go Reader("recede.log", "child", messages)
+	//go preprocessReader("recede.log", "child", messages)
+	go writer("detach.log", "child", messages)
+
+	 //fmt.Println("EXITING")
+	//for {}
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -547,8 +619,8 @@ func main() {
 	fmt.Print("\n")
     cmd := exec.Command("./nixos-git-deploy-go", "child")
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 
     err = cmd.Start()
 	if err != nil {
@@ -572,6 +644,8 @@ func main() {
 
 	go writer("recede.log", "parent", messages, settings)
 	go Reader("detach.log", "parent", messages, settings)
+
+	messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
 	for {
 		options := []string{"init", "apply", "status", "remove", "upgrade", "add-automatic", "add", "remote-init", "age", "destination"}

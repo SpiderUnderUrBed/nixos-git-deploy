@@ -10,6 +10,7 @@ Seeing if this still exist
 Will this still exist?
 
 E
+<<<<<<< HEAD
 A
 S
 S
@@ -25,3 +26,11 @@ Test
 
 New additon
 E
+=======
+
+E
+
+Testing persist
+
+THis wont work
+>>>>>>> 287239070fa1b7e0f60c77af5557190bfaa34208
