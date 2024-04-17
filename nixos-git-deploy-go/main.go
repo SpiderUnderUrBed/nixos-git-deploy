@@ -29,8 +29,8 @@ import (
 	"github.com/go-git/go-git/v5/config"
 )
 
-var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-var watchedFiles = make(map[string]bool)
+ var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+// var watchedFiles = make(map[string]bool)
 
 type Config struct {
 	UserAllowed string `json:"UserAllowed"`

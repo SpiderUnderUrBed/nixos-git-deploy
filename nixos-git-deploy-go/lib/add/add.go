@@ -12,10 +12,12 @@ import (
 	"github.com/go-git/go-git/v5"
 	//"github.com/go-git/go-git/v5/config"
 )
+var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+var watchedFiles = make(map[string]bool)
 
 func ModifyFile(filename string) error {
-	var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-// var watchedFiles = make(map[string]bool)
+// 	var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+// // var watchedFiles = make(map[string]bool)
 
 	// Splits the filename by '/' to get all elements in a path
 	parts := strings.Split(filename, "/")
@@ -62,8 +64,8 @@ func ModifyFile(filename string) error {
 
 // Function to add files to Git repository
 func AddFilesToGit(files []string, r *git.Repository) error {
-	var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-// var watchedFiles = make(map[string]bool)
+// 	var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+// // var watchedFiles = make(map[string]bool)
 
 	worktree, err := r.Worktree()
 	if err != nil {
@@ -100,8 +102,8 @@ func AddFilesToGit(files []string, r *git.Repository) error {
 
 // Function to watch for file changes
 func WatchChanges(filename string) {
-	// var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-var watchedFiles = make(map[string]bool)
+// 	// var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+// var watchedFiles = make(map[string]bool)
 
 	// Check if the file is already being watched
 	fmt.Println(filename)
