@@ -3,11 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
+	//"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
+	//"path/filepath"
 	"strings"
 	"syscall"
 	// "log"
@@ -17,13 +17,14 @@ import (
 	"strconv"
 	"encoding/json"
 	// "bytes"
-
-	"nixos-git-deploy-go/lib"
+	// "nixos-git-deploy-go/lib/"
+    "nixos-git-deploy-go/lib/add"
+	"nixos-git-deploy-go/lib/aged"
 
 	// "filippo.io/age"
 	// "filippo.io/age/armor"
 	"golang.org/x/sys/unix"
-	"github.com/fsnotify/fsnotify"
+	//"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 )
@@ -42,155 +43,7 @@ type Config struct {
 // 	firstTi 
 // }
 // Function to modify the file within the Git repository
-func modifyFile(filename string) error {
-	// Splits the filename by '/' to get all elements in a path
-	parts := strings.Split(filename, "/")
-	// Once you split it, you can find the ACTUAL filename
-	fileName := parts[len(parts)-1]
 
-	// Gets the absolute path of the coorosponding git file
-	gitFilePath := filepath.Join(gitDirectory, fileName)
-
-	// Read the content of the original file
-	content, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-
-	// TODO: See if go lets you append the newly added content to the file instead of overriting the whole thing with itself?
-	modifiedContent := string(content)
-
-	// Write the modified contents back to the file in the Git directory
-	if err := ioutil.WriteFile(gitFilePath, []byte(modifiedContent), 0644); err != nil {
-		return err
-	}
-
-	// Open the Git repository
-	r, err := git.PlainOpen(gitDirectory)
-	if err != nil {
-		return err
-	}
-
-	// Get the worktree
-	worktree, err := r.Worktree()
-	if err != nil {
-		return err
-	}
-
-	// Add the modified file to the Git staging area
-	if _, err := worktree.Add(fileName); err != nil {
-		return err
-	}
-
-	//fmt.Printf("File %s has been successfully modified in the Git repository\n", fileName)
-	return nil
-}
-
-// Function to add files to Git repository
-func addFilesToGit(files []string, r *git.Repository) error {
-	worktree, err := r.Worktree()
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		// Check if the file exists
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			fmt.Println("File does not exist:", file)
-			continue
-		}
-
-		// Determine the filename without the path
-		fileName := filepath.Base(file)
-
-		// Destination path in the Git directory
-		destination := filepath.Join(gitDirectory, fileName)
-
-		// Copy the file to the Git directory
-		if err := copyFile(file, destination); err != nil {
-			return err
-		}
-
-		// Add the file to the Git repository
-		_, err := worktree.Add(fileName)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Function to watch for file changes
-func watchChanges(filename string) {
-	// Check if the file is already being watched
-	fmt.Println(filename)
-	if _, ok := watchedFiles[filename]; ok {
-		fmt.Printf("File %s is already being watched\n", filename)
-		return
-	}
-
-	// Create a new watcher
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		fmt.Printf("Error creating watcher for file %s: %v\n", filename, err)
-		return
-	}
-	defer watcher.Close()
-
-	// Add the file to the watcher
-	err = watcher.Add(filename)
-	if err != nil {
-		fmt.Printf("Error adding file %s to watcher: %v\n", filename, err)
-		return
-	}
-	watchedFiles[filename] = true
-
-	// Start watching for events
-	//fmt.Printf("Watching for changes in file: %s\n", filename)
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				//fmt.Printf("File %s has been modified\n", filename)
-				err := modifyFile(filename)
-				if err != nil {
-					//fmt.Println("ERROR:", err)
-				}
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			fmt.Printf("Error watching file %s: %v\n", filename, err)
-		}
-	}
-}
-
-// Function to copy a file
-func copyFile(src, dest string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destinationFile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer destinationFile.Close()
-
-	_, err = io.Copy(destinationFile, sourceFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 func keepAlive(f *os.File, origin string) {
     i := 0
     for {
@@ -214,7 +67,7 @@ func processParentArgs(args []string, messages chan string){
 		if (args[0] == "watch"){
 			messages <- "responding " + args[1]
 			//fmt.Println("+"+args[1]+"+")
-			go watchChanges(args[1])
+			go add.WatchChanges(args[1])
 		} else if args[0] == "new" {
 			expectedPID, err := strconv.Atoi(args[1])
 			if err != nil {
@@ -361,7 +214,7 @@ func runChildProcess() {
 		}
 	
 		// Start watching the file in a goroutine
-		go watchChanges(settings.FilesToWatch[i])
+		go add.WatchChanges(settings.FilesToWatch[i])
 	}
 	//fmt.Println(settings.FilesToWatch)
 	jsonData, err := json.Marshal(settings)
@@ -676,7 +529,7 @@ func main() {
 		
 			if git, err := git.PlainOpen(gitDirectory); err == nil {
 				go func() {
-					if err := addFilesToGit(files, git); err != nil {
+					if err := add.AddFilesToGit(files, git); err != nil {
 						fmt.Println("Error adding files to Git:", err)
 					} else {
 						//fmt.Printf("Added %d file(s) to Git\n", len(files))
@@ -685,7 +538,7 @@ func main() {
 			}
 		
 			for _, file := range files {
-				modifyFile(file)
+				add.ModifyFile(file)
 			}
 		
 		case "status":
@@ -699,7 +552,7 @@ func main() {
 			//fmt.Println("test")
 			if git, err := git.PlainOpen(gitDirectory); err == nil {
 				go func() {
-					if err := addFilesToGit(files, git); err != nil {
+					if err := add.AddFilesToGit(files, git); err != nil {
 						fmt.Println("Error adding files to Git:", err)
 					} else {
 						//fmt.Printf("Added %d file(s) to Git\n", len(files))
