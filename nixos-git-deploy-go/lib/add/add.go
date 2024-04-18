@@ -163,16 +163,18 @@ func CopyFile(src, dest string) error {
 	}
 	defer sourceFile.Close()
 
+
 	destinationFile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
 	defer destinationFile.Close()
 
+
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
 		return err
 	}
-
+	
 	return nil
 }

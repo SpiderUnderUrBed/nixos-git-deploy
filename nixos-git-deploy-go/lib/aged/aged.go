@@ -53,7 +53,7 @@ func Encrypt(filename string) {
 	privateKeyFile := "privatekey.txt"
 	privateKey, err := ioutil.ReadFile(privateKeyFile)
 	if err != nil {
-		fmt.Println("Not using keyfile")
+		//fmt.Println("Not using keyfile")
 		if !os.IsNotExist(err) {
 			log.Fatalf("Failed to read private key file: %v", err)
 		}
@@ -70,14 +70,14 @@ func Encrypt(filename string) {
 			log.Fatalf("Failed to write private key to file: %v", err)
 		}
 	} else {
-		fmt.Println("Using keyfile")
+		//fmt.Println("Using keyfile")
 	}
 
 	// Check if the public key file exists
 	publicKeyFile := "publickey.txt"
 	publicKey, err := ioutil.ReadFile(publicKeyFile)
 	if err != nil {
-		fmt.Println("Not using keyfile")
+		//fmt.Println("Not using keyfile")
 		if !os.IsNotExist(err) {
 			log.Fatalf("Failed to read public key file: %v", err)
 		}
@@ -94,7 +94,7 @@ func Encrypt(filename string) {
 			log.Fatalf("Failed to write public key to file: %v", err)
 		}
 	} else {
-		fmt.Println("Using keyfile")
+		//fmt.Println("Using keyfile")
 	}
 
 	// Create an encrypted file
@@ -105,6 +105,8 @@ func Encrypt(filename string) {
 	defer encryptedFile.Close()
 
 	// Encrypt the message and write to the encrypted file
+	//, gitDirectory string
+	//filepath.Join
 	armorWriter := armor.NewWriter(encryptedFile)
 	recipient, err := age.ParseX25519Recipient(string(publicKey))
 	if err != nil {
@@ -119,4 +121,6 @@ func Encrypt(filename string) {
 	}
 	w.Close()
 	armorWriter.Close()
+
+	fmt.Println("Encrypted file")
 }

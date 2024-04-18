@@ -3,7 +3,7 @@ package main
 import (
         "bufio"
         "fmt"
-        //"io"
+      //  "io"
         "io/ioutil"
         "os"
         "os/signal"
@@ -32,16 +32,17 @@ import (
 )
 
 var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-
+var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
 // var watchedFiles = make(map[string]bool)
 
 type Config struct {
-        UserAllowed  string   `json:"UserAllowed"`
-        FirstTime    string   `json:"FirstTime"`
-        FilesToWatch []string `json:"filesToWatch"`
-        trackedFiles []string `json:"trackedFiles"`
-		encryptedFiles []string `json:"encryptedFiles"`
+    UserAllowed    string   `json:"UserAllowed"`
+    FirstTime      string   `json:"FirstTime"`
+    FilesToWatch   []string `json:"FilesToWatch"`
+    EncryptedFiles []string `json:"EncryptedFiles"`
+    TrackedFiles   []string `json:"TrackedFiles"`
 }
+
 
 // type Settings struct {
 //      UserAllowed: "n",
@@ -163,10 +164,11 @@ func runChildProcess() {
         //fmt.Println("STARTED CHILD PROCESS")
 
         configFile := Config{
-                // UserAllowed: "y",
-                // FirstTime:   "y",
-                // FilesToWatch: nil,
-                // trackedFiles: nil
+                UserAllowed: "y",
+                FirstTime:   "y",
+                FilesToWatch: nil,
+                TrackedFiles: nil,
+				EncryptedFiles: nil,
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -283,8 +285,84 @@ func killProcess(pid int) error {
         return nil
 }
 
-func main() {
+func Santitize(configFile Config){
+	// for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
+	// 	fileName := filepath.Base(path)
+	// 	TrackedFiles = append(TrackedFiles, fileName)
+	// }
+	    // Open the directory
 
+		//intersectArrays
+	for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
+		if !fileExists(filepath.Join(gitDirectory, file)) {
+			fmt.Println(file)
+			destinationFile := filepath.Join(gitDirectory, filepath.Base(file))
+			err := add.CopyFile(file, destinationFile)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+		
+
+    d, err := os.Open(gitDirectory)
+    if err != nil {
+        fmt.Println("Error opening directory:", err)
+        return
+    }
+    defer d.Close()
+
+    // Read the files in the directory
+    files, err := d.Readdir(-1)
+    if err != nil {
+        fmt.Println("Error reading directory:", err)
+        return
+    }
+
+	// fmt.Println(files)
+    // Print the names of all the files
+    // fmt.Println("Files in", dir, ":")
+    // Initialize EncryptedFilesBases outside the loop
+	var EncryptedFilesBases []string
+	var PathBases []string
+	// Loop over configFile.EncryptedFiles to populate EncryptedFilesBases
+	for _, path := range files { 
+		// Split the path by "/"
+		parts := strings.Split(path.Name(), "/")
+		// Get the last part of the path
+		fileName := parts[len(parts)-1]
+		// Append the filename to EncryptedFilesBases
+		EncryptedFilesBases = append(EncryptedFilesBases, fileName)
+	}
+	for _, path := range configFile.EncryptedFiles {
+		parts := strings.Split(path, "/")
+		// Get the last part of the path
+		fileName := parts[len(parts)-1]
+		// Append the filename to PathBases
+		PathBases = append(PathBases, fileName)
+	}
+	improperFiles := intersectArrays(PathBases, EncryptedFilesBases)
+	//fmt.Println(improperFiles)
+	for _, file := range files {
+		if indexOf(improperFiles, file.Name()) != -1 {
+			fmt.Println("REMOVING " + file.Name())
+			err := os.Remove(filepath.Join(gitDirectory, file.Name()))
+			if err != nil {
+				fmt.Printf("Error deleting file: %v\n", err)
+				return
+			}
+		}
+	}
+		
+        // fmt.Println(file.Name())
+    
+	configFile.TrackedFiles = unique(configFile.TrackedFiles)
+	configFile.EncryptedFiles = unique(configFile.EncryptedFiles)
+	configFile.FilesToWatch = unique(configFile.FilesToWatch)
+}
+
+func main() {
+		//Santitize(configFile)
         //Check if there are any command-line arguments
         if len(os.Args) > 1 && os.Args[1] == "child" {
                 // This is the child process
@@ -298,9 +376,8 @@ func main() {
                 UserAllowed:  "y",
                 FirstTime:    "y",
                 FilesToWatch: nil,
-				encryptedFiles: nil, 
-				trackedFiles: nil,
-
+				EncryptedFiles: nil, 
+				TrackedFiles: nil,
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -353,8 +430,8 @@ func main() {
                 fmt.Print("If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
                 userallow, _ := reader.ReadString('\n')
                 userallow = strings.TrimSpace(userallow)
-
-                if userallow == "n" {
+			//if (strings.ToLower(wouldTrackFiles) == "n"){
+                if strings.ToLower(userallow) == "n" {
                         //fmt.Println("User inputted ")
                         configFile.UserAllowed = "n"
                 }
@@ -421,14 +498,15 @@ func main() {
         messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
         for {
-                options := []string{" init", " apply", " status", " remove", " upgrade", " watch", " clean", " post", " add", "remote-init", "age", "destination", "merge"}
+			//	Santitize(configFile)
+                options := []string{" init", " apply", " status", " remove", " upgrade", " watch", " clean", " post", "sanitize", "add", "remote-init", "age", "destination", "merge", "git"}
 
                 fmt.Println("What do you want to do?")
                 for i, option := range options {
                         fmt.Printf("%d. %s\n", i+1, option)
                 }
 
-                fmt.Print("Enter your choice (1-11): ")
+                fmt.Print("Enter your choice (1-15): ")
                 choice, _ := reader.ReadString('\n')
                 choice = strings.TrimSpace(choice)
                 index := -1
@@ -437,8 +515,9 @@ func main() {
                         fmt.Println("Invalid choice, please try again.")
                         continue
                 }
-
-                switch options[index-1] {
+				//fmt.Println(options[index-1])
+                switch strings.TrimSpace(options[index-1]) {
+					
                 case "init":
                         if !ifDirectoryExists(gitDirectory + "/.git") {
                                 _, err := git.PlainInit(gitDirectory, false)
@@ -502,10 +581,27 @@ func main() {
                         for _, remote := range remotes {
                                 fmt.Printf("Name: %s, URLs: %v\n", remote.Config().Name, remote.Config().URLs)
                         }
-                case "destination":
+				case "git":
+                
+				case "destination":
 
                 case "age":
 						// jsonData, _ := json.Marshal(configFile)
+						fmt.Print("Do you want to watch the files? [y/N]: ")
+                        wouldTrackFiles, _ := reader.ReadString('\n')
+                        wouldTrackFiles = strings.TrimSpace(wouldTrackFiles)
+						wouldTrackFilesBool := false
+						if (strings.ToLower(wouldTrackFiles) == "y"){
+							wouldTrackFilesBool = true
+						} 
+					
+						fmt.Print("Do you want to track the files? [Y/n]: ")
+                        wouldWatchFiles, _ := reader.ReadString('\n')
+                        wouldWatchFiles = strings.TrimSpace(wouldWatchFiles)
+						wouldWatchFilesBool := true
+						if (strings.ToLower(wouldWatchFiles) == "n"){
+							wouldWatchFilesBool = false
+						} 
 
                         fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
                         filesInput, _ := reader.ReadString('\n')
@@ -513,11 +609,54 @@ func main() {
                         files := strings.Split(filesInput, ",")
                         for _, file := range files {
                                 aged.Encrypt(file)
-								// configFile.encryptedFiles.append(configFile.encryptedFiles, file)
-								configFile.encryptedFiles = append(configFile.encryptedFiles, file)
+								// sourceFile, err := os.Open(file)
+								// if err != nil {
+								// 	fmt.Println(err)
+								// }
+								// defer sourceFile.Close()
+							
+								// destinationFile, err := os.Create(filepath.Join(gitDirectory, file + ".encrypted"))
+								// if err != nil {
+								// 	fmt.Println(err)
+								// }
+								// defer destinationFile.Close()
+							
+								// _, err = io.Copy(destinationFile, sourceFile)
+								// if err != nil {
+								// 	fmt.Println(err)
+								// }
+								//add.CopyFile(file + ".encrypted", filepath.Join(gitDirectory, file + ".encrypted"))
+								// filepath.Join(gitDirectory,
+								//CopyFile
+								//ModifyFile
+								// configFile.EncryptedFiles.append(configFile.EncryptedFiles, file)
+								index := indexOf(configFile.FilesToWatch, file)
+								if index != -1 {
+									configFile.FilesToWatch[index] = file + ".encrypted"
+									//configFile.FilesToWatch = append(configFile.FilesToWatch[:index], configFile.FilesToWatch[index+1:]...)
+								} else if (wouldWatchFilesBool == true){
+									//configFile.TrackedFiles = append(configFile.TrackedFiles, file)
+									configFile.FilesToWatch = append(configFile.FilesToWatch, file + ".encrypted")
+								}
+
+								index = indexOf(configFile.TrackedFiles, file)
+								if index != -1 {
+									configFile.TrackedFiles[index] = file + ".encrypted"
+									//configFile.TrackedFiles = append(configFile.TrackedFiles[:index], configFile.TrackedFiles[index+1:]...)
+								} else if (wouldTrackFilesBool == true){
+									//configFile.TrackedFiles = append(configFile.TrackedFiles, file)
+									configFile.TrackedFiles = append(configFile.TrackedFiles, file + ".encrypted")
+								}
+
+								configFile.EncryptedFiles = append(configFile.EncryptedFiles, file)
                         }
+						fmt.Println(configFile)
 						jsonData, _ := json.Marshal(configFile)
-						ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+						err := ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+						if (err != nil){
+							fmt.Println(err)
+						}
+						//Santitize(configFile)
                 case "apply":
                         // Open the Git repository
                         repo, err := git.PlainOpen(gitDirectory)
@@ -588,14 +727,17 @@ func main() {
                         fmt.Println("Changes pushed successfully")
                 case "remove":
                         // Add your logic for "remove" here
+				case "sanitize":
+					fmt.Println("cleaning!")
+					Santitize(configFile)
                 case "clean":
-                        var trackedFiles []string
-                        //trackedFiles = append(settings.FilesToWatch)
-                        for _, path := range append(settings.trackedFiles, settings.FilesToWatch...) {
+                        var TrackedFiles []string
+                        //TrackedFiles = append(settings.FilesToWatch)
+                        for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
                                 fileName := filepath.Base(path)
-                                trackedFiles = append(trackedFiles, fileName)
+                                TrackedFiles = append(TrackedFiles, fileName)
                         }
-                        //fmt.Println(trackedFiles)
+                        //fmt.Println(TrackedFiles)
 
                         d, err := os.Open(gitDirectory)
                         if err != nil {
@@ -616,7 +758,7 @@ func main() {
                                 // Check if it's a regular file
                                 if file.Mode().IsRegular() {
                                         //fmt.Println(file.Name())
-                                        index := indexOf(trackedFiles, file.Name())
+                                        index := indexOf(TrackedFiles, file.Name())
                                         // fmt.Println(index, file.Name())
                                         if index == -1 {
                                                 filePath := filepath.Join(gitDirectory, file.Name())
@@ -629,13 +771,6 @@ func main() {
                                         }
                                 }
                         }
-                        // for i := 0; i < len(settings.trackedFiles); i++ {
-                        //      // Check if the file exists
-                        //      // if _, err := os.Stat(settings.trackedFiles[i]); os.IsNotExist(err) {
-                        //      //      continue;
-                        //      // }
-
-                        // }
                 case "post":
 
                 case "upgrade":
@@ -658,7 +793,7 @@ func main() {
                         }
 
                         for _, file := range files {
-                                configFile.trackedFiles = append(configFile.trackedFiles, file)
+                                configFile.TrackedFiles = append(configFile.TrackedFiles, file)
                                 jsonData, err := json.Marshal(configFile)
                                 //fmt.Println(jsonData)
                                 if err != nil {
@@ -719,6 +854,25 @@ func main() {
                 }
         }
 }
+func intersectArrays(arr1 []string, arr2 []string) []string {
+    intersection := make([]string, 0)
+    
+    // Create a map to store unique elements from arr1
+    elements := make(map[string]bool)
+    for _, str := range arr1 {
+        elements[str] = true
+    }
+    
+    // Check if elements from arr2 exist in the map
+    for _, str := range arr2 {
+        if elements[str] {
+            intersection = append(intersection, str)
+        }
+    }
+    
+    return intersection
+}
+
 func indexOf(array []string, target string) int {
         for i, item := range array {
                 if item == target {
@@ -739,4 +893,26 @@ func ensureDirectoryExists(directory string) {
 func ifDirectoryExists(directory string) bool {
         _, err := os.Stat(directory)
         return !os.IsNotExist(err)
+}
+
+func unique(arr []string) []string {
+    occurred := map[string]bool{}
+    result := []string{}
+    for e := range arr {
+     
+        // check if already the mapped
+        // variable is set to true or not
+        if occurred[arr[e]] != true {
+            occurred[arr[e]] = true
+             
+            // Append to result slice.
+            result = append(result, arr[e])
+        }
+    }
+ 
+    return result
+}
+func fileExists(fileName string) bool {
+    _, err := os.Stat(fileName)
+    return !os.IsNotExist(err)
 }
