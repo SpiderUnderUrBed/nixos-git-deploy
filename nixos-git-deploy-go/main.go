@@ -3,14 +3,14 @@ package main
 import (
         "bufio"
         "fmt"
-      //  "io"
+        //"io"
         "io/ioutil"
         "os"
         "os/signal"
         "path/filepath"
         "strings"
         "syscall"
-        // "log"
+        "log"
         "time"
         //"syscall"
         "encoding/json"
@@ -168,7 +168,7 @@ func runChildProcess() {
                 FirstTime:   "y",
                 FilesToWatch: nil,
                 TrackedFiles: nil,
-				EncryptedFiles: nil,
+                                EncryptedFiles: nil,
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -286,24 +286,24 @@ func killProcess(pid int) error {
 }
 
 func Santitize(configFile Config){
-	// for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
-	// 	fileName := filepath.Base(path)
-	// 	TrackedFiles = append(TrackedFiles, fileName)
-	// }
-	    // Open the directory
+        // for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
+        // 	fileName := filepath.Base(path)
+        // 	TrackedFiles = append(TrackedFiles, fileName)
+        // }
+            // Open the directory
 
-		//intersectArrays
-	for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
-		if !fileExists(filepath.Join(gitDirectory, file)) {
-			fmt.Println(file)
-			destinationFile := filepath.Join(gitDirectory, filepath.Base(file))
-			err := add.CopyFile(file, destinationFile)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	}
-		
+                //intersectArrays
+        for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
+                if !fileExists(filepath.Join(gitDirectory, file)) {
+                        fmt.Println(file)
+                        destinationFile := filepath.Join(gitDirectory, filepath.Base(file))
+                        err := add.CopyFile(file, destinationFile)
+                        if err != nil {
+                                fmt.Println(err)
+                        }
+                }
+        }
+                
 
     d, err := os.Open(gitDirectory)
     if err != nil {
@@ -319,50 +319,50 @@ func Santitize(configFile Config){
         return
     }
 
-	// fmt.Println(files)
+        // fmt.Println(files)
     // Print the names of all the files
     // fmt.Println("Files in", dir, ":")
     // Initialize EncryptedFilesBases outside the loop
-	var EncryptedFilesBases []string
-	var PathBases []string
-	// Loop over configFile.EncryptedFiles to populate EncryptedFilesBases
-	for _, path := range files { 
-		// Split the path by "/"
-		parts := strings.Split(path.Name(), "/")
-		// Get the last part of the path
-		fileName := parts[len(parts)-1]
-		// Append the filename to EncryptedFilesBases
-		EncryptedFilesBases = append(EncryptedFilesBases, fileName)
-	}
-	for _, path := range configFile.EncryptedFiles {
-		parts := strings.Split(path, "/")
-		// Get the last part of the path
-		fileName := parts[len(parts)-1]
-		// Append the filename to PathBases
-		PathBases = append(PathBases, fileName)
-	}
-	improperFiles := intersectArrays(PathBases, EncryptedFilesBases)
-	//fmt.Println(improperFiles)
-	for _, file := range files {
-		if indexOf(improperFiles, file.Name()) != -1 {
-			fmt.Println("REMOVING " + file.Name())
-			err := os.Remove(filepath.Join(gitDirectory, file.Name()))
-			if err != nil {
-				fmt.Printf("Error deleting file: %v\n", err)
-				return
-			}
-		}
-	}
-		
+        var EncryptedFilesBases []string
+        var PathBases []string
+        // Loop over configFile.EncryptedFiles to populate EncryptedFilesBases
+        for _, path := range files { 
+                // Split the path by "/"
+                parts := strings.Split(path.Name(), "/")
+                // Get the last part of the path
+                fileName := parts[len(parts)-1]
+                // Append the filename to EncryptedFilesBases
+                EncryptedFilesBases = append(EncryptedFilesBases, fileName)
+        }
+        for _, path := range configFile.EncryptedFiles {
+                parts := strings.Split(path, "/")
+                // Get the last part of the path
+                fileName := parts[len(parts)-1]
+                // Append the filename to PathBases
+                PathBases = append(PathBases, fileName)
+        }
+        improperFiles := intersectArrays(PathBases, EncryptedFilesBases)
+        //fmt.Println(improperFiles)
+        for _, file := range files {
+                if indexOf(improperFiles, file.Name()) != -1 {
+                        fmt.Println("REMOVING " + file.Name())
+                        err := os.Remove(filepath.Join(gitDirectory, file.Name()))
+                        if err != nil {
+                                fmt.Printf("Error deleting file: %v\n", err)
+                                return
+                        }
+                }
+        }
+                
         // fmt.Println(file.Name())
     
-	configFile.TrackedFiles = unique(configFile.TrackedFiles)
-	configFile.EncryptedFiles = unique(configFile.EncryptedFiles)
-	configFile.FilesToWatch = unique(configFile.FilesToWatch)
+        configFile.TrackedFiles = unique(configFile.TrackedFiles)
+        configFile.EncryptedFiles = unique(configFile.EncryptedFiles)
+        configFile.FilesToWatch = unique(configFile.FilesToWatch)
 }
 
 func main() {
-		//Santitize(configFile)
+                //Santitize(configFile)
         //Check if there are any command-line arguments
         if len(os.Args) > 1 && os.Args[1] == "child" {
                 // This is the child process
@@ -376,8 +376,8 @@ func main() {
                 UserAllowed:  "y",
                 FirstTime:    "y",
                 FilesToWatch: nil,
-				EncryptedFiles: nil, 
-				TrackedFiles: nil,
+                                EncryptedFiles: nil, 
+                                TrackedFiles: nil,
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -423,14 +423,14 @@ func main() {
         //fmt.Print(settings)
         if settings.FirstTime == "y" {
                 //      print("user not allowed")
-				configFile.FirstTime = "n"
-				fmt.Print("Hello! This is nixos-git-deploy.\n Here are all the commands \n POST: it will update all your files which you are tracking \n WATCH: It will look for any file changes even after script death and update your files \n CLEAN: clean any files that arnt being tracked or watched \n status, shows you the git status of the repo and files that are being tracked and watched (not by git) \n apply: will apply all your changes to your repo starting with a pull request sent to catch errors early, then you enter details for the commit, then it pushes \n remote-init: will add a remote \n age: will add age encryption to your file you want to push to your remotes. \n destination: changes the default git repo destination \n init: initilizes the repo \n upgrade, pulls your changes \n merge: 3 way merge between the remote, your target and source \n")
-				fmt.Print("Enter to continue: ")
-				reader.ReadString('\n')
+                                configFile.FirstTime = "n"
+                                fmt.Print("Hello! This is nixos-git-deploy.\n Here are all the commands \n POST: it will update all your files which you are tracking \n WATCH: It will look for any file changes even after script death and update your files \n CLEAN: clean any files that arnt being tracked or watched \n status, shows you the git status of the repo and files that are being tracked and watched (not by git) \n apply: will apply all your changes to your repo starting with a pull request sent to catch errors early, then you enter details for the commit, then it pushes \n remote-init: will add a remote \n age: will add age encryption to your file you want to push to your remotes. \n destination: changes the default git repo destination \n init: initilizes the repo \n upgrade, pulls your changes \n merge: 3 way merge between the remote, your target and source \n")
+                                fmt.Print("Enter to continue: ")
+                                reader.ReadString('\n')
                 fmt.Print("If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
                 userallow, _ := reader.ReadString('\n')
                 userallow = strings.TrimSpace(userallow)
-			//if (strings.ToLower(wouldTrackFiles) == "n"){
+                        //if (strings.ToLower(wouldTrackFiles) == "n"){
                 if strings.ToLower(userallow) == "n" {
                         //fmt.Println("User inputted ")
                         configFile.UserAllowed = "n"
@@ -498,15 +498,15 @@ func main() {
         messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
         for {
-			//	Santitize(configFile)
-                options := []string{" init", " apply", " status", " remove", " upgrade", " watch", " clean", " post", "sanitize", "add", "remote-init", "age", "destination", "merge", "git"}
+                        //	Santitize(configFile)
+                options := []string{" list", " init", " apply", " status", " remove", " upgrade", " quick-merge", " watch", " clean", "post", "sanitize", "add", "remote-init", "age", "destination", "merge", "git"}
 
                 fmt.Println("What do you want to do?")
                 for i, option := range options {
                         fmt.Printf("%d. %s\n", i+1, option)
                 }
 
-                fmt.Print("Enter your choice (1-15): ")
+                fmt.Print("Enter your choice (1-16): ")
                 choice, _ := reader.ReadString('\n')
                 choice = strings.TrimSpace(choice)
                 index := -1
@@ -515,10 +515,45 @@ func main() {
                         fmt.Println("Invalid choice, please try again.")
                         continue
                 }
-				//fmt.Println(options[index-1])
+                                //fmt.Println(options[index-1])
                 switch strings.TrimSpace(options[index-1]) {
-					
+                
+                case "quick-merge":
+                       
+                case "list":
+                        files, err := ioutil.ReadDir(gitDirectory)
+                        if err != nil {
+                            log.Fatal(err)
+                        }
+                    
+                        // Loop over the files and directories
+                        for _, file := range files {
+                            fmt.Println(file.Name())
+                        }
                 case "init":
+			
+                        if !ifDirectoryExists(gitDirectory + "/.ngdg") {
+                                err := os.Mkdir(gitDirectory + "/.ngdg", 0755)
+                                if err != nil {
+                                        fmt.Println("Error creating directory:", err)
+                                        return
+                                }
+                                // if (!fileExists(gitDirectory + "/."))
+                                if !ifDirectoryExists(gitDirectory + "/.ngdg/config") {
+                                        err := os.Mkdir(gitDirectory + "/.ngdg/config", 0755)
+                                        if err != nil {
+                                                fmt.Println("Error creating directory:", err)
+                                                return
+                                        }
+                                }
+                                if !ifDirectoryExists(gitDirectory + "/.ngdg/remote") {
+                                        err := os.Mkdir(gitDirectory + "/.ngdg/remote", 0755)
+                                        if err != nil {
+                                                fmt.Println("Error creating directory:", err)
+                                                return
+                                        }
+                                } 
+                        }
                         if !ifDirectoryExists(gitDirectory + "/.git") {
                                 _, err := git.PlainInit(gitDirectory, false)
                                 if err != nil {
@@ -544,6 +579,86 @@ func main() {
                         } else {
                                 fmt.Println("Git repository already initialized.")
                         }
+			
+			if (!fileExists(gitDirectory + ".gitmodules")){
+                                file, err := os.Create(gitDirectory + ".gitmodules")
+                                if err != nil {
+                                    fmt.Println("Error creating file:", err)
+                                    return
+                                }
+                                defer file.Close()
+			}
+			fmt.Print("Whats your repo name?: ")
+			repoName, _ := reader.ReadString('\n')
+			repoName = strings.TrimSpace(repoName)
+
+			// fmt.Print("Whats your repo url?: ")
+			// repoUrl, _ := reader.ReadString('\n')
+			// repoUrl = strings.TrimSpace(repoUrl)
+			// sub, _ := worktree.Submodule(repoUrl)
+
+
+			// git.PlainInit(gitDirectory+"/.ngdg/remote/", false)
+			// repo, err := git.PlainOpen(gitDirectory)
+			// if err != nil {
+			// 	// Handle error
+			// 	fmt.Println("Error opening repository:", err)
+			// 	return
+			// }
+			
+			// worktree, err := repo.Worktree()
+			// if err != nil {
+			// 	// Handle error
+			// 	fmt.Println("Error getting worktree:", err)
+			// 	return
+			// }
+
+
+			// sr, err := sub.Repository()
+			// if err != nil {
+			// 	fmt.Println(err)
+			// }
+		
+			// sw, err := sr.Worktree()
+			// if err != nil {
+			// 	fmt.Println(err)
+			// }
+			// err = sw.Pull(&git.PullOptions{
+			// 	RemoteName: "origin",
+			// })
+			// exec.Command("git", "submodule", "update", "--remote")
+			add.FileEnsureStrings(gitDirectory+".gitmodules", []string{
+				"[submodule \"" + repoName + "\"]\n",
+				"path = .ngdg/remote",
+				"url = " + gitDirectory + "/.ngdg/remote/" + repoName,
+			})
+			
+			// exec.Command("git", "submodule", "init")
+			// exec.Command("git", "submodule", "update")
+			// exec.Command("git", "submodule", "add", repoUrl)
+			// exec.Command("git", "submodule", "update")
+			//cmd := exec.Command("git", "submodule", "add", "file://", gitDirectory+"/.ngdg/remote/")
+			// cmd.Stdout = os.Stdout
+			// _, err = worktree.Submodule(gitDirectory + "/.ngdg/remote")
+			// if err != nil {
+			//     // Handle error
+			//     fmt.Println("Error adding submodule:", err)
+			//     return
+			// }
+			
+			// if (!ifDirectoryExists(gitDirectory + "/.ngdg/remote/.git")){
+				// git.PlainInit(gitDirectory + "/.ngdg/remote/", false)
+				// // w, err := r.Worktree()
+				// // if err != nil {
+				// // 	CheckIfError(err)
+				// // }
+				
+
+				// repo, _ := git.PlainOpen(gitDirectory)
+				// fmt.Println("Repository:", repo)
+				// lw.Submodule(gitDirectory + "/.ngdg/remote/")
+
+			// }
                 case "remote-init":
                         fmt.Print("Enter the remote (SSH URL): ")
                         remote, _ := reader.ReadString('\n')
@@ -581,27 +696,27 @@ func main() {
                         for _, remote := range remotes {
                                 fmt.Printf("Name: %s, URLs: %v\n", remote.Config().Name, remote.Config().URLs)
                         }
-				case "git":
+                                case "git":
                 
-				case "destination":
+                                case "destination":
 
                 case "age":
-						// jsonData, _ := json.Marshal(configFile)
-						fmt.Print("Do you want to watch the files? [y/N]: ")
+                                                // jsonData, _ := json.Marshal(configFile)
+                                                fmt.Print("Do you want to watch the files? [y/N]: ")
                         wouldTrackFiles, _ := reader.ReadString('\n')
                         wouldTrackFiles = strings.TrimSpace(wouldTrackFiles)
-						wouldTrackFilesBool := false
-						if (strings.ToLower(wouldTrackFiles) == "y"){
-							wouldTrackFilesBool = true
-						} 
-					
-						fmt.Print("Do you want to track the files? [Y/n]: ")
+                                                wouldTrackFilesBool := false
+                                                if (strings.ToLower(wouldTrackFiles) == "y"){
+                                                        wouldTrackFilesBool = true
+                                                } 
+                                        
+                                                fmt.Print("Do you want to track the files? [Y/n]: ")
                         wouldWatchFiles, _ := reader.ReadString('\n')
                         wouldWatchFiles = strings.TrimSpace(wouldWatchFiles)
-						wouldWatchFilesBool := true
-						if (strings.ToLower(wouldWatchFiles) == "n"){
-							wouldWatchFilesBool = false
-						} 
+                                                wouldWatchFilesBool := true
+                                                if (strings.ToLower(wouldWatchFiles) == "n"){
+                                                        wouldWatchFilesBool = false
+                                                } 
 
                         fmt.Print("Enter the path of the file(s) you want to add (comma-separated): ")
                         filesInput, _ := reader.ReadString('\n')
@@ -609,54 +724,54 @@ func main() {
                         files := strings.Split(filesInput, ",")
                         for _, file := range files {
                                 aged.Encrypt(file)
-								// sourceFile, err := os.Open(file)
-								// if err != nil {
-								// 	fmt.Println(err)
-								// }
-								// defer sourceFile.Close()
-							
-								// destinationFile, err := os.Create(filepath.Join(gitDirectory, file + ".encrypted"))
-								// if err != nil {
-								// 	fmt.Println(err)
-								// }
-								// defer destinationFile.Close()
-							
-								// _, err = io.Copy(destinationFile, sourceFile)
-								// if err != nil {
-								// 	fmt.Println(err)
-								// }
-								//add.CopyFile(file + ".encrypted", filepath.Join(gitDirectory, file + ".encrypted"))
-								// filepath.Join(gitDirectory,
-								//CopyFile
-								//ModifyFile
-								// configFile.EncryptedFiles.append(configFile.EncryptedFiles, file)
-								index := indexOf(configFile.FilesToWatch, file)
-								if index != -1 {
-									configFile.FilesToWatch[index] = file + ".encrypted"
-									//configFile.FilesToWatch = append(configFile.FilesToWatch[:index], configFile.FilesToWatch[index+1:]...)
-								} else if (wouldWatchFilesBool == true){
-									//configFile.TrackedFiles = append(configFile.TrackedFiles, file)
-									configFile.FilesToWatch = append(configFile.FilesToWatch, file + ".encrypted")
-								}
+                                                                // sourceFile, err := os.Open(file)
+                                                                // if err != nil {
+                                                                // 	fmt.Println(err)
+                                                                // }
+                                                                // defer sourceFile.Close()
+                                                        
+                                                                // destinationFile, err := os.Create(filepath.Join(gitDirectory, file + ".encrypted"))
+                                                                // if err != nil {
+                                                                // 	fmt.Println(err)
+                                                                // }
+                                                                // defer destinationFile.Close()
+                                                        
+                                                                // _, err = io.Copy(destinationFile, sourceFile)
+                                                                // if err != nil {
+                                                                // 	fmt.Println(err)
+                                                                // }
+                                                                //add.CopyFile(file + ".encrypted", filepath.Join(gitDirectory, file + ".encrypted"))
+                                                                // filepath.Join(gitDirectory,
+                                                                //CopyFile
+                                                                //ModifyFile
+                                                                // configFile.EncryptedFiles.append(configFile.EncryptedFiles, file)
+                                                                index := indexOf(configFile.FilesToWatch, file)
+                                                                if index != -1 {
+                                                                        configFile.FilesToWatch[index] = file + ".encrypted"
+                                                                        //configFile.FilesToWatch = append(configFile.FilesToWatch[:index], configFile.FilesToWatch[index+1:]...)
+                                                                } else if (wouldWatchFilesBool == true){
+                                                                        //configFile.TrackedFiles = append(configFile.TrackedFiles, file)
+                                                                        configFile.FilesToWatch = append(configFile.FilesToWatch, file + ".encrypted")
+                                                                }
 
-								index = indexOf(configFile.TrackedFiles, file)
-								if index != -1 {
-									configFile.TrackedFiles[index] = file + ".encrypted"
-									//configFile.TrackedFiles = append(configFile.TrackedFiles[:index], configFile.TrackedFiles[index+1:]...)
-								} else if (wouldTrackFilesBool == true){
-									//configFile.TrackedFiles = append(configFile.TrackedFiles, file)
-									configFile.TrackedFiles = append(configFile.TrackedFiles, file + ".encrypted")
-								}
+                                                                index = indexOf(configFile.TrackedFiles, file)
+                                                                if index != -1 {
+                                                                        configFile.TrackedFiles[index] = file + ".encrypted"
+                                                                        //configFile.TrackedFiles = append(configFile.TrackedFiles[:index], configFile.TrackedFiles[index+1:]...)
+                                                                } else if (wouldTrackFilesBool == true){
+                                                                        //configFile.TrackedFiles = append(configFile.TrackedFiles, file)
+                                                                        configFile.TrackedFiles = append(configFile.TrackedFiles, file + ".encrypted")
+                                                                }
 
-								configFile.EncryptedFiles = append(configFile.EncryptedFiles, file)
+                                                                configFile.EncryptedFiles = append(configFile.EncryptedFiles, file)
                         }
-						fmt.Println(configFile)
-						jsonData, _ := json.Marshal(configFile)
-						err := ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
-						if (err != nil){
-							fmt.Println(err)
-						}
-						//Santitize(configFile)
+                                                fmt.Println(configFile)
+                                                jsonData, _ := json.Marshal(configFile)
+                                                err := ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+                                                if (err != nil){
+                                                        fmt.Println(err)
+                                                }
+                                                //Santitize(configFile)
                 case "apply":
                         // Open the Git repository
                         repo, err := git.PlainOpen(gitDirectory)
@@ -727,9 +842,9 @@ func main() {
                         fmt.Println("Changes pushed successfully")
                 case "remove":
                         // Add your logic for "remove" here
-				case "sanitize":
-					fmt.Println("cleaning!")
-					Santitize(configFile)
+                                case "sanitize":
+                                        fmt.Println("cleaning!")
+                                        Santitize(configFile)
                 case "clean":
                         var TrackedFiles []string
                         //TrackedFiles = append(settings.FilesToWatch)
@@ -852,6 +967,8 @@ func main() {
                                 fmt.Println("Error opening Git repository:", err)
                         }
                 }
+                fmt.Println("press enter to continue... ")
+                reader.ReadString('\n')
         }
 }
 func intersectArrays(arr1 []string, arr2 []string) []string {

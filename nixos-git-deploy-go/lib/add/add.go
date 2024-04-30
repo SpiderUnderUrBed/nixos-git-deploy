@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"fmt"
 	"os"
+	"log"
+	"bufio"
 
 	"path/filepath"
 	"github.com/fsnotify/fsnotify"
@@ -177,4 +179,39 @@ func CopyFile(src, dest string) error {
 	}
 	
 	return nil
+}
+func FileEnsureStrings(file string, contentList []string) any {
+	for _, e := range contentList {
+		content := e
+		hasLine := false
+
+		f, err := os.OpenFile(file, os.O_RDWR, 0644)
+		if err != nil {
+				log.Fatal(err)
+		}
+
+		// read the file line by line using scanner
+		scanner := bufio.NewScanner(f)
+
+		for scanner.Scan() {
+		// do something with a line
+		// fmt.Printf("line: %s\n", scanner.Text())
+		if (strings.Contains(scanner.Text(), content)){
+		hasLine = true
+		}
+		}
+
+		if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+		}
+		if (hasLine == false){
+		if _, err := f.Write([]byte("\n " + content)); err != nil {
+		log.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+		log.Fatal(err)
+		}
+		}
+	}
+return "Success"
 }
