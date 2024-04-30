@@ -4,7 +4,6 @@ import (
         "bufio"
         "fmt"
         //"io"
-	"io/fs"
         "io/ioutil"
         "os"
         "os/signal"
@@ -19,9 +18,10 @@ import (
         "strconv"
         // "bytes"
         // "nixos-git-deploy-go/lib/"
-        "nixos-git-deploy-go/lib/add"
+        "nixos-git-deploy-go/lib/fc"
         "nixos-git-deploy-go/lib/aged"
-
+	"nixos-git-deploy-go/lib/core"
+	"nixos-git-deploy-go/lib/egit"
         // "filippo.io/age"
         // "filippo.io/age/armor"
 	//"golang.org/x/exp/slices"
@@ -43,6 +43,8 @@ type Config struct {
     FilesToWatch   []string `json:"FilesToWatch"`
     EncryptedFiles []string `json:"EncryptedFiles"`
     TrackedFiles   []string `json:"TrackedFiles"`
+    URL   string `json:"URL"`
+    Name   string `json:"Name"`
 }
 
 
@@ -74,7 +76,7 @@ func processParentArgs(args []string, messages chan string) {
         if args[0] == "watch" {
                 messages <- "responding " + args[1]
                 //fmt.Println("+"+args[1]+"+")
-                go add.WatchChanges(args[1])
+                go fc.WatchChanges(args[1])
         } else if args[0] == "new" {
                 expectedPID, err := strconv.Atoi(args[1])
                 if err != nil {
@@ -170,7 +172,9 @@ func runChildProcess() {
                 FirstTime:   "y",
                 FilesToWatch: nil,
                 TrackedFiles: nil,
-                                EncryptedFiles: nil,
+                EncryptedFiles: nil,
+		URL: "",
+		Name: "",
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -223,7 +227,7 @@ func runChildProcess() {
                 }
 
                 // Start watching the file in a goroutine
-                go add.WatchChanges(settings.FilesToWatch[i])
+                go fc.WatchChanges(settings.FilesToWatch[i])
         }
         //fmt.Println(settings.FilesToWatch)
         jsonData, err := json.Marshal(settings)
@@ -297,10 +301,10 @@ func Santitize(configFile Config){
 
                 //intersectArrays
         for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
-                if !fileExists(filepath.Join(gitDirectory, file)) {
-                        fmt.Println(file)
+                if !core.FileExists(filepath.Join(gitDirectory, file)) {
+                        // fmt.Println(file)
                         destinationFile := filepath.Join(gitDirectory, filepath.Base(file))
-                        err := add.CopyFile(file, destinationFile)
+                        err := fc.CopyFile(file, destinationFile)
                         if err != nil {
                                 fmt.Println(err)
                         }
@@ -334,6 +338,7 @@ func Santitize(configFile Config){
                 parts := strings.Split(path.Name(), "/")
                 // Get the last part of the path
                 fileName := parts[len(parts)-1]
+		// fmt.Println(fileName)
                 // Append the filename to EncryptedFilesBases
                 EncryptedFilesBases = append(EncryptedFilesBases, fileName)
         }
@@ -341,13 +346,14 @@ func Santitize(configFile Config){
                 parts := strings.Split(path, "/")
                 // Get the last part of the path
                 fileName := parts[len(parts)-1]
+		// fmt.Println(fileName)
                 // Append the filename to PathBases
                 PathBases = append(PathBases, fileName)
         }
-        improperFiles := intersectArrays(PathBases, EncryptedFilesBases)
+        improperFiles := core.IntersectArrays(PathBases, EncryptedFilesBases)
         //fmt.Println(improperFiles)
         for _, file := range files {
-                if indexOf(improperFiles, file.Name()) != -1 {
+                if core.IndexOf(improperFiles, file.Name()) != -1 {
                         fmt.Println("REMOVING " + file.Name())
                         err := os.Remove(filepath.Join(gitDirectory, file.Name()))
                         if err != nil {
@@ -356,12 +362,26 @@ func Santitize(configFile Config){
                         }
                 }
         }
-                
-        // fmt.Println(file.Name())
-    
-        configFile.TrackedFiles = unique(configFile.TrackedFiles)
-        configFile.EncryptedFiles = unique(configFile.EncryptedFiles)
-        configFile.FilesToWatch = unique(configFile.FilesToWatch)
+
+        // configFile.TrackedFiles, _, _ = core.Unique(configFile.TrackedFiles)
+        // configFile.EncryptedFiles, _, _ = core.Unique(configFile.EncryptedFiles)
+        // configFile.FilesToWatch, _, _ = core.Unique(configFile.FilesToWatch)
+
+	// Remove duplicates from TrackedFiles slice
+	configFile.TrackedFiles = core.UniqueWithEncryption(configFile.TrackedFiles)
+	configFile.EncryptedFiles = core.Unique(configFile.EncryptedFiles)
+	configFile.FilesToWatch = core.UniqueWithEncryption(configFile.FilesToWatch)
+	
+	jsonData, err := json.Marshal(configFile)
+	//fmt.Println(jsonData)
+	if err != nil {
+		fmt.Println("Error with JSON:", err)
+	}
+
+	err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+	if err != nil {
+		fmt.Println("Error with file:", err)
+	}
 }
 
 func main() {
@@ -379,8 +399,10 @@ func main() {
                 UserAllowed:  "y",
                 FirstTime:    "y",
                 FilesToWatch: nil,
-                                EncryptedFiles: nil, 
-                                TrackedFiles: nil,
+                EncryptedFiles: nil, 
+                TrackedFiles: nil,
+		URL: "",
+		Name: "",
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -426,11 +448,11 @@ func main() {
         //fmt.Print(settings)
         if settings.FirstTime == "y" {
                 //      print("user not allowed")
-                                configFile.FirstTime = "n"
-                                fmt.Print("Hello! This is nixos-git-deploy.\n Here are all the commands \n POST: it will update all your files which you are tracking \n WATCH: It will look for any file changes even after script death and update your files \n CLEAN: clean any files that arnt being tracked or watched \n status, shows you the git status of the repo and files that are being tracked and watched (not by git) \n apply: will apply all your changes to your repo starting with a pull request sent to catch errors early, then you enter details for the commit, then it pushes \n remote-init: will add a remote \n age: will add age encryption to your file you want to push to your remotes. \n destination: changes the default git repo destination \n init: initilizes the repo \n upgrade, pulls your changes \n merge: 3 way merge between the remote, your target and source \n")
-                                fmt.Print("Enter to continue: ")
-                                reader.ReadString('\n')
-                fmt.Print("If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
+	configFile.FirstTime = "n"
+	fmt.Print("Hello! This is nixos-git-deploy.\n Here are all the commands \n POST: it will update all your files which you are tracking \n WATCH: It will look for any file changes even after script death and update your files \n CLEAN: clean any files that arnt being tracked or watched \n status, shows you the git status of the repo and files that are being tracked and watched (not by git) \n apply: will apply all your changes to your repo starting with a pull request sent to catch errors early, then you enter details for the commit, then it pushes \n remote-init: will add a remote \n age: will add age encryption to your file you want to push to your remotes. \n destination: changes the default git repo destination \n init: initilizes the repo \n upgrade, pulls your changes \n quit: self explanitory \n full-merge: 3 way merge between the remote, your target and source \n partial-merge: if a file is removed in your local configuration/destination/remote or added it will update that in your repo/destination/local configuration \n")
+	fmt.Print("Enter to continue: ")
+	reader.ReadString('\n')
+	fmt.Print("If allowed, we will spawn backround processes to\n watch for file changes if allowed, and a backround\n process so that if in the event of a crash or deletion\n of the main files the file watchers will be\n deleted, are you ok with this?[Y/n] ")
                 userallow, _ := reader.ReadString('\n')
                 userallow = strings.TrimSpace(userallow)
                         //if (strings.ToLower(wouldTrackFiles) == "n"){
@@ -501,8 +523,8 @@ func main() {
         messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
         for {
-                        //	Santitize(configFile)
-                options := []string{" list", " init", " apply", " status", " remove", " upgrade", " quick-merge", " watch", " clean", "post", "sanitize", "add", "remote-init", "age", "destination", "merge", "git", "quit"}
+                //	Santitize(configFile)
+                options := []string{" list", " init", " apply", " status", " remove", " upgrade", " partial-merge", " watch", " clean", "post", "sanitize", "add", "remote-init", "age", "destination", "merge-all", "git", "quit"}
 
                 fmt.Println("What do you want to do?")
                 for i, option := range options {
@@ -525,7 +547,7 @@ func main() {
 			fmt.Println("Exiting the program.")
 			Cleanup(messages)
 			os.Exit(0)
-                case "quick-merge":
+                case "partial-merge":
 			// Directory path
 			// dirPath := "/path/to/your/directory"
 			// indexing := []
@@ -556,15 +578,15 @@ func main() {
 			}
 			for _, fileInfo := range Indexing {
 				if (fileInfo.Name() != ".git"){
-					if !ContainsFSName(fileInfos, fileInfo.Name()) {
-						fmt.Println("Removed: " + fileInfo.Name())
+					if !core.ContainsFSName(fileInfos, fileInfo.Name()) {
+						fmt.Println("Added: " + fileInfo.Name())
 					}
 				}
 			}
 			for _, fileInfo := range fileInfos {
 				if (fileInfo.Name() != ".git"){
-					if !ContainsFSName(Indexing, fileInfo.Name()) {
-						fmt.Println("Added: " + fileInfo.Name())
+					if !core.ContainsFSName(Indexing, fileInfo.Name()) {
+						fmt.Println("Removed: " + fileInfo.Name())
 					}
 				}
 			}
@@ -579,21 +601,21 @@ func main() {
                             fmt.Println(file.Name())
                         }
                 case "init":		
-                        if !ifDirectoryExists(gitDirectory + "/.ngdg") {
+                        if !core.IfDirectoryExists(gitDirectory + "/.ngdg") {
                                 err := os.Mkdir(gitDirectory + "/.ngdg", 0755)
                                 if err != nil {
                                         fmt.Println("Error creating directory:", err)
                                         return
                                 }
                                 // if (!fileExists(gitDirectory + "/."))
-                                if !ifDirectoryExists(gitDirectory + "/.ngdg/config") {
+                                if !core.IfDirectoryExists(gitDirectory + "/.ngdg/config") {
                                         err := os.Mkdir(gitDirectory + "/.ngdg/config", 0755)
                                         if err != nil {
                                                 fmt.Println("Error creating directory:", err)
                                                 return
                                         }
                                 }
-                                if !ifDirectoryExists(gitDirectory + "/.ngdg/remote") {
+                                if !core.IfDirectoryExists(gitDirectory + "/.ngdg/remote") {
                                         err := os.Mkdir(gitDirectory + "/.ngdg/remote", 0755)
                                         if err != nil {
                                                 fmt.Println("Error creating directory:", err)
@@ -601,7 +623,7 @@ func main() {
                                         }
                                 } 
                         }
-                        if !ifDirectoryExists(gitDirectory + "/.git") {
+                        if !core.IfDirectoryExists(gitDirectory + "/.git") {
                                 _, err := git.PlainInit(gitDirectory, false)
                                 if err != nil {
                                         fmt.Println("Error initializing git repository:", err)
@@ -626,7 +648,7 @@ func main() {
                         } else {
                                 fmt.Println("Git repository already initialized.")
                         }
-			if (!fileExists(gitDirectory + ".gitmodules")){
+			if (!core.FileExists(gitDirectory + ".gitmodules")){
                                 file, err := os.Create(gitDirectory + ".gitmodules")
                                 if err != nil {
                                     fmt.Println("Error creating file:", err)
@@ -730,7 +752,7 @@ func main() {
                         files := strings.Split(filesInput, ",")
                         for _, file := range files {
                                 aged.Encrypt(file)
-				index := indexOf(configFile.FilesToWatch, file)
+				index := core.IndexOf(configFile.FilesToWatch, file)
 				if index != -1 {
 					configFile.FilesToWatch[index] = file + ".encrypted"
 					//configFile.FilesToWatch = append(configFile.FilesToWatch[:index], configFile.FilesToWatch[index+1:]...)
@@ -739,7 +761,7 @@ func main() {
 					configFile.FilesToWatch = append(configFile.FilesToWatch, file + ".encrypted")
 				}
 
-				index = indexOf(configFile.TrackedFiles, file)
+				index = core.IndexOf(configFile.TrackedFiles, file)
 				if index != -1 {
 					configFile.TrackedFiles[index] = file + ".encrypted"
 					//configFile.TrackedFiles = append(configFile.TrackedFiles[:index], configFile.TrackedFiles[index+1:]...)
@@ -858,7 +880,7 @@ func main() {
                                 // Check if it's a regular file
                                 if file.Mode().IsRegular() {
                                         //fmt.Println(file.Name())
-                                        index := indexOf(TrackedFiles, file.Name())
+                                        index := core.IndexOf(TrackedFiles, file.Name())
                                         // fmt.Println(index, file.Name())
                                         if index == -1 {
                                                 filePath := filepath.Join(gitDirectory, file.Name())
@@ -873,6 +895,8 @@ func main() {
                         }
                 case "post":
 
+		case "merge-all":
+
                 case "upgrade":
                         // Add your logic for "upgrade" here
                 case "add":
@@ -884,7 +908,7 @@ func main() {
 
                         if git, err := git.PlainOpen(gitDirectory); err == nil {
                                 go func() {
-                                        if err := add.AddFilesToGit(files, git); err != nil {
+                                        if err := egit.AddFilesToGit(files, git); err != nil {
                                                 fmt.Println("Error adding files to Git:", err)
                                         } else {
                                                 //fmt.Printf("Added %d file(s) to Git\n", len(files))
@@ -904,7 +928,7 @@ func main() {
                                 if err != nil {
                                         fmt.Println(err)
                                 }
-                                add.ModifyFile(file)
+                                fc.ModifyFile(file)
 
                         }
 
@@ -919,7 +943,7 @@ func main() {
                         //fmt.Println("test")
                         if git, err := git.PlainOpen(gitDirectory); err == nil {
                                 go func() {
-                                        if err := add.AddFilesToGit(files, git); err != nil {
+                                        if err := egit.AddFilesToGit(files, git); err != nil {
                                                 fmt.Println("Error adding files to Git:", err)
                                         } else {
                                                 //fmt.Printf("Added %d file(s) to Git\n", len(files))
@@ -955,75 +979,4 @@ func main() {
                 fmt.Println("press enter to continue... ")
                 reader.ReadString('\n')
         }
-}
-func intersectArrays(arr1 []string, arr2 []string) []string {
-    intersection := make([]string, 0)
-    
-    // Create a map to store unique elements from arr1
-    elements := make(map[string]bool)
-    for _, str := range arr1 {
-        elements[str] = true
-    }
-    
-    // Check if elements from arr2 exist in the map
-    for _, str := range arr2 {
-        if elements[str] {
-            intersection = append(intersection, str)
-        }
-    }
-    
-    return intersection
-}
-
-func indexOf(array []string, target string) int {
-        for i, item := range array {
-                if item == target {
-                        return i // Return the index if found
-                }
-        }
-        return -1 // Return -1 if not found
-}
-
-// Function to create directory if it doesn't exist
-func ensureDirectoryExists(directory string) {
-        if _, err := os.Stat(directory); os.IsNotExist(err) {
-                os.MkdirAll(directory, 0755)
-        }
-}
-
-// Function to check if directory exists
-func ifDirectoryExists(directory string) bool {
-        _, err := os.Stat(directory)
-        return !os.IsNotExist(err)
-}
-
-func unique(arr []string) []string {
-    occurred := map[string]bool{}
-    result := []string{}
-    for e := range arr {
-     
-        // check if already the mapped
-        // variable is set to true or not
-        if occurred[arr[e]] != true {
-            occurred[arr[e]] = true
-             
-            // Append to result slice.
-            result = append(result, arr[e])
-        }
-    }
- 
-    return result
-}
-func fileExists(fileName string) bool {
-    _, err := os.Stat(fileName)
-    return !os.IsNotExist(err)
-}
-func ContainsFSName(slice []fs.FileInfo, item string) bool {
-	for _, s := range slice {
-		//fmt.Println(s.Name() + " " + item)
-		if s.Name() == item {
-			return true
-		}
-	}
-	return false
 }
