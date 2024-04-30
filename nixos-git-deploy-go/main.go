@@ -5,7 +5,9 @@ import (
         "fmt"
         //"io"
         "io/ioutil"
+	"io/fs"
         "os"
+	"os/user"
         "os/signal"
         "path/filepath"
         "strings"
@@ -32,9 +34,9 @@ import (
         "github.com/go-git/go-git/v5/plumbing/object"
         "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
-
-var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
-var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
+var usr, _ = user.Current()
+var gitDirectory = usr.HomeDir + ".config/nixos-git-deploy"
+// var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
 // var watchedFiles = make(map[string]bool)
 
 type Config struct {
@@ -45,6 +47,7 @@ type Config struct {
     TrackedFiles   []string `json:"TrackedFiles"`
     URL   string `json:"URL"`
     Name   string `json:"Name"`
+    Destination   string `json:"Destination"`
 }
 
 
@@ -396,8 +399,25 @@ func Santitize(configFile Config){
 		fmt.Println("Error with file:", err)
 	}
 }
-
+func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
+	for _, fileInfo := range arr1 {
+		if (fileInfo.Name() != ".git"){
+			if !core.ContainsFSName(arr2, fileInfo.Name()) {
+				fmt.Println("Added: " + fileInfo.Name())
+			}
+		}
+	}
+	for _, fileInfo := range arr2 {
+		if (fileInfo.Name() != ".git"){
+			if !core.ContainsFSName(arr1, fileInfo.Name()) {
+				fmt.Println("Removed: " + fileInfo.Name())
+			}
+		}
+	}
+}
 func main() {
+	//usr, err := user.Current()
+	fmt.Println(usr.HomeDir)
                 //Santitize(configFile)
         //Check if there are any command-line arguments
         if len(os.Args) > 1 && os.Args[1] == "child" {
@@ -416,6 +436,7 @@ func main() {
                 TrackedFiles: nil,
 		URL: "",
 		Name: "",
+		Destination: "",
         }
 
         rawConfig, err := os.Open("./config.json")
@@ -578,31 +599,18 @@ func main() {
 			
 
 			// Read the contents of the directory
-			fileInfos, err := dir.Readdir(-1)
+			remoteDirList, err := dir.Readdir(-1)
 			if err != nil {
 				fmt.Println("Error reading directory contents:", err)
 				return
 			}
 
-			Indexing, err := gitDir.Readdir(-1)
+			gitDirList, err := gitDir.Readdir(-1)
 			if err != nil {
 				fmt.Println("Error reading directory contents:", err)
 				return
 			}
-			for _, fileInfo := range Indexing {
-				if (fileInfo.Name() != ".git"){
-					if !core.ContainsFSName(fileInfos, fileInfo.Name()) {
-						fmt.Println("Added: " + fileInfo.Name())
-					}
-				}
-			}
-			for _, fileInfo := range fileInfos {
-				if (fileInfo.Name() != ".git"){
-					if !core.ContainsFSName(Indexing, fileInfo.Name()) {
-						fmt.Println("Removed: " + fileInfo.Name())
-					}
-				}
-			}
+			PartialMergeTakeTwoLists(gitDirList, remoteDirList)
                 case "list":
                         files, err := ioutil.ReadDir(gitDirectory)
                         if err != nil {
@@ -674,6 +682,7 @@ func main() {
 				fmt.Print("Whats your repo name?: ")
 				repoName, _ := reader.ReadString('\n')
 				repoName = strings.TrimSpace(repoName)
+				configFile.Name = repoName
 			} else {
 				repoName = configFile.Name
 			}
@@ -682,6 +691,7 @@ func main() {
 			       fmt.Print("Whats your repo url?: ")
 			       repoUrl, _ := reader.ReadString('\n')
 			       repoUrl = strings.TrimSpace(repoUrl)
+			       configFile.URL = repoUrl
 			} else {
 			       repoUrl = configFile.URL
 			}
@@ -760,7 +770,15 @@ func main() {
 				return
 			}
 		case "destination":
-
+			fmt.Println("Enter the destination :")
+			destArgs, _ := reader.ReadString('\n')
+			destArgs = strings.TrimSpace(destArgs)
+			if (core.IfDirectoryExists(destArgs)){
+			  configFile.Destination = destArgs
+			} else {
+			  fmt.Println("Not a directory")
+			}
+			WriteConfig(configFile)
                 case "age":
                         // jsonData, _ := json.Marshal(configFile)
                         fmt.Print("Do you want to watch the files? [y/N]: ")
