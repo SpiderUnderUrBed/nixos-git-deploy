@@ -250,6 +250,19 @@ func runChildProcess() {
         <-c
         fmt.Println("Exited")
 }
+func WriteConfig(configFile Config){
+	jsonData, err := json.Marshal(configFile)
+	//fmt.Println(jsonData)
+	if err != nil {
+		fmt.Println("Error with JSON:", err)
+	}
+
+	err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// fc.ModifyFile(file)
+}
 func Cleanup(messages chan string){
 	        // Close the messages channel to stop writer goroutine
         close(messages)
@@ -656,13 +669,33 @@ func main() {
                                 }
                                 defer file.Close()
 			}
-			fmt.Print("Whats your repo name?: ")
-			repoName, _ := reader.ReadString('\n')
-			repoName = strings.TrimSpace(repoName)
+			var repoName string
+			if (configFile.Name == ""){
+				fmt.Print("Whats your repo name?: ")
+				repoName, _ := reader.ReadString('\n')
+				repoName = strings.TrimSpace(repoName)
+			} else {
+				repoName = configFile.Name
+			}
+			var repoUrl string
+			if (configFile.URL == ""){
+			       fmt.Print("Whats your repo url?: ")
+			       repoUrl, _ := reader.ReadString('\n')
+			       repoUrl = strings.TrimSpace(repoUrl)
+			} else {
+			       repoUrl = configFile.URL
+			}
+			// jsonData, err := json.Marshal(configFile)
+			// fc.ModifyFile(file)//fmt.Println(jsonData)
+			// if err != nil {
+			// 	fmt.Println("Error with JSON:", err)
+			// }
 
-			 fmt.Print("Whats your repo url?: ")
-			 repoUrl, _ := reader.ReadString('\n')
-			 repoUrl = strings.TrimSpace(repoUrl)
+			// err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
+			// if err != nil {
+			// 	fmt.Println(err)
+			// }
+			WriteConfig(configFile)
 
 			cmd := exec.Command("git", "submodule", "add", repoUrl, ".ngdg/remote/" + repoName)
 			exec.Command("git", "submodule", "update")
@@ -918,19 +951,10 @@ func main() {
 
                         for _, file := range files {
                                 configFile.TrackedFiles = append(configFile.TrackedFiles, file)
-                                jsonData, err := json.Marshal(configFile)
-                                //fmt.Println(jsonData)
-                                if err != nil {
-                                        fmt.Println("Error with JSON:", err)
-                                }
-
-                                err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
-                                if err != nil {
-                                        fmt.Println(err)
-                                }
-                                fc.ModifyFile(file)
-
+				fc.ModifyFile(file)
                         }
+			WriteConfig(configFile)
+			// fc.ModifyFile(file)
 
                 case "status":
                         // Add your logic for "status" here
