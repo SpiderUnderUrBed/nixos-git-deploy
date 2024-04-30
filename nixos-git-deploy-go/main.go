@@ -579,7 +579,14 @@ func main() {
                         } else {
                                 fmt.Println("Git repository already initialized.")
                         }
-			
+			if (!fileExists(gitDirectory + ".ngdg/submodule.sh")){
+                                file, err := os.Create(gitDirectory + ".ngdg/submodule.sh")
+                                if err != nil {
+                                    fmt.Println("Error creating file:", err)
+                                    return
+                                }
+                                defer file.Close()
+			}
 			if (!fileExists(gitDirectory + ".gitmodules")){
                                 file, err := os.Create(gitDirectory + ".gitmodules")
                                 if err != nil {
@@ -592,32 +599,33 @@ func main() {
 			repoName, _ := reader.ReadString('\n')
 			repoName = strings.TrimSpace(repoName)
 
-			// fmt.Print("Whats your repo url?: ")
-			// repoUrl, _ := reader.ReadString('\n')
-			// repoUrl = strings.TrimSpace(repoUrl)
-			// sub, _ := worktree.Submodule(repoUrl)
+			 fmt.Print("Whats your repo url?: ")
+			 repoUrl, _ := reader.ReadString('\n')
+			 repoUrl = strings.TrimSpace(repoUrl)
 
 
-			// git.PlainInit(gitDirectory+"/.ngdg/remote/", false)
-			// repo, err := git.PlainOpen(gitDirectory)
-			// if err != nil {
-			// 	// Handle error
-			// 	fmt.Println("Error opening repository:", err)
+			//  git.PlainInit(gitDirectory+"/.ngdg/remote/", false)
+			//  repo, err := git.PlainOpen(gitDirectory)
+			//    if err != nil {
+			//  	// Handle error
+			//  	fmt.Println("Error opening repository:", err)
 			// 	return
-			// }
+			//    }
 			
-			// worktree, err := repo.Worktree()
-			// if err != nil {
-			// 	// Handle error
-			// 	fmt.Println("Error getting worktree:", err)
-			// 	return
-			// }
+			//  worktree, err := repo.Worktree()
+			//  if err != nil {
+			//  	// Handle error
+			//  	fmt.Println("Error getting worktree:", err)
+			//  	return
+			 //}
 
+			//  sub, _ := worktree.Submodule(repoUrl)
 
-			// sr, err := sub.Repository()
-			// if err != nil {
-			// 	fmt.Println(err)
-			// }
+			//  sub.Init()
+			//  sr, err := sub.Repository()
+			//   if err != nil {
+			//   	fmt.Println(err)
+			//   }
 		
 			// sw, err := sr.Worktree()
 			// if err != nil {
@@ -627,11 +635,30 @@ func main() {
 			// 	RemoteName: "origin",
 			// })
 			// exec.Command("git", "submodule", "update", "--remote")
+
+			//note
+			// cmd := exec.Command("chmod", "+x", gitDirectory+".ngdg/submodule.sh")
+			//git update-index --add --cacheinfo 160000,0b06c1d3d1ed194516c28a881fbb7b49920ab35a,dotfiles
+			 add.FileEnsureStrings(gitDirectory+".ngdg/submodule.sh", []string{
+			 	"",
+			})
+			cmd := exec.Command("git", "submodule", "add", "https://github.com/SpiderUnderUrBed/dotfiles.git")
+			// cmd := exec.Command("/bin/sh", gitDirectory+".ngdg/submodule.sh")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stdout
+			cmd.Dir = gitDirectory
+
+			err := cmd.Run()
+			if (err != nil){
+				fmt.Println(err)
+			}
+			//cmd.Stderr = os.Stderr
 			add.FileEnsureStrings(gitDirectory+".gitmodules", []string{
 				"[submodule \"" + repoName + "\"]\n",
 				"path = .ngdg/remote",
 				"url = " + gitDirectory + "/.ngdg/remote/" + repoName,
 			})
+
 			
 			// exec.Command("git", "submodule", "init")
 			// exec.Command("git", "submodule", "update")
