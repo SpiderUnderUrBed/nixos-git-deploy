@@ -14,6 +14,7 @@ import (
         "syscall"
         "log"
         "time"
+        "errors"
         //"syscall"
         "encoding/json"
         "os/exec"
@@ -36,6 +37,7 @@ import (
 )
 var usr, _ = user.Current()
 var gitDirectory = usr.HomeDir + "/.config/nixos-git-deploy"
+var egitMod egit.EgitMod
 // var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
 // var watchedFiles = make(map[string]bool)
 
@@ -399,25 +401,31 @@ func Santitize(configFile Config){
 		fmt.Println("Error with file:", err)
 	}
 }
-func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
-	for _, fileInfo := range arr1 {
-		if (fileInfo.Name() != ".git"){
-			if !core.ContainsFSName(arr2, fileInfo.Name()) {
-				fmt.Println("Added: " + fileInfo.Name())
+
+func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo) {
+	for j := 0; j < len(arr1)-1; j++ {
+		fileInfo := arr1[j].Name()
+                //PartialMergeTakeTwoListsFSName(arr2[j])
+		if fileInfo != ".git" {
+			if !core.ContainsFSName(arr2, fileInfo) {
+				fmt.Println("Added: " + fileInfo)
 			}
 		}
-	}
-	for _, fileInfo := range arr2 {
-		if (fileInfo.Name() != ".git"){
-			if !core.ContainsFSName(arr1, fileInfo.Name()) {
-				fmt.Println("Removed: " + fileInfo.Name())
+        }
+	for j := 0; j < len(arr1)-1; j++ {
+		fileInfo := arr1[j].Name()
+                // PartialMergeTakeTwoListsFSName(arr1[j])
+		if fileInfo != ".git" {
+			if core.ContainsFSName(arr2, fileInfo) {
+				fmt.Println("Removed: " + fileInfo)
 			}
 		}
 	}
 }
+
 func main() {
 	//usr, err := user.Current()
-	fmt.Println(usr.HomeDir)
+	//fmt.Println(usr.HomeDir)
                 //Santitize(configFile)
         //Check if there are any command-line arguments
         if len(os.Args) > 1 && os.Args[1] == "child" {
@@ -427,6 +435,10 @@ func main() {
         }
 
         reader := bufio.NewReader(os.Stdin)
+
+	egitMod := egitMod.Init(gitDirectory)
+	// egitMod.AddFilesToGit()
+	// fmt.Println(egitMod)
 
         configFile := Config{
                 UserAllowed:  "y",
@@ -586,31 +598,83 @@ func main() {
 			// dirPath := "/path/to/your/directory"
 			// indexing := []
 			// Open the directory
+			fmt.Println("Pick one of these 3 options to be subject to change (r for repo, l for local (source) and t for target), q to exit")
+			source, _ := reader.ReadString('\n')
+			source = strings.TrimSpace(source)
+			if (source == "q"){
+				main()
+			}
+
+			fmt.Println("Pick one of these 3 options to be the refrence (r for repo, l for local (source) and t for target), q to exit")
+			target, _ := reader.ReadString('\n')
+			target = strings.TrimSpace(target)
+			if (source == "q"){
+				main()
+			}
+
+			var remoteDirList []fs.FileInfo
+			if (source == "r" || target == "r"){
 			dir, err := os.Open(gitDirectory + "/.ngdg/remote/dotfiles/")
 			if err != nil {
 				fmt.Println("Error opening directory:", err)
 				return
 			}
-			gitDir, err := os.Open(gitDirectory)
+			remoteDirList, err = dir.Readdir(-1)
 			if err != nil {
-				fmt.Println("Error opening directory:", err)
+				fmt.Println("Error reading directory contents:", err)
 				return
 			}
-			
+			}
+			var gitDirList []fs.FileInfo
+			if (source == "t" || target == "t"){
+				gitDir, err := os.Open(gitDirectory)
+				if err != nil {
+					fmt.Println("Error opening directory:", err)
+					return
+				}
+				gitDirList, err = gitDir.Readdir(-1)
+				if err != nil {
+					fmt.Println("Error reading directory contents:", err)
+					return
+				}
+			}
 
 			// Read the contents of the directory
-			remoteDirList, err := dir.Readdir(-1)
-			if err != nil {
-				fmt.Println("Error reading directory contents:", err)
-				return
+			var localList []fs.FileInfo
+			if (source == "l" || target == "l"){
+				for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
+                                        if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+                                        continue;
+                                        }
+					localFile, _ := os.Stat(file) 
+					//fmt.Println(localList)
+					localList = append(localList, localFile)
+				}
+			}
+			var sourceList []fs.FileInfo
+			var targetList []fs.FileInfo
+			if (source == "r"){
+				sourceList = remoteDirList
+			} 
+			 if (target == "r"){
+				targetList = remoteDirList
+			} 
+			 if (source == "t"){
+				sourceList = gitDirList
+			} 
+			 if (target == "t"){
+				targetList = gitDirList
+			} 
+			 if (source == "l"){
+				sourceList = localList
+			}
+			 if (target == "l"){
+				targetList = localList
 			}
 
-			gitDirList, err := gitDir.Readdir(-1)
-			if err != nil {
-				fmt.Println("Error reading directory contents:", err)
-				return
-			}
-			PartialMergeTakeTwoLists(gitDirList, remoteDirList)
+			//fmt.Println(sourceList)
+			//fmt.Println("ended")
+			PartialMergeTakeTwoLists(sourceList, targetList)
                 case "list":
                         files, err := ioutil.ReadDir(gitDirectory)
                         if err != nil {
@@ -900,6 +964,7 @@ func main() {
                         fmt.Println("Changes pushed successfully")
                 case "remove":
                         // Add your logic for "remove" here
+
 		case "sanitize":
 			fmt.Println("cleaning!")
 			Santitize(configFile)
@@ -947,7 +1012,16 @@ func main() {
                 case "post":
 
 		case "merge-all":
-
+			for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
+				if !core.FileExists(filepath.Join(gitDirectory, file)) {
+					// fmt.Println(file)
+					destinationFile := filepath.Join(gitDirectory, filepath.Base(file))
+					err := fc.CopyFile(file, destinationFile)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+			}
                 case "upgrade":
                         // Add your logic for "upgrade" here
                 case "add":
@@ -959,7 +1033,7 @@ func main() {
 
                         if git, err := git.PlainOpen(gitDirectory); err == nil {
                                 go func() {
-                                        if err := egit.AddFilesToGit(files, git); err != nil {
+                                        if err := egitMod.AddFilesToGit(files, git); err != nil {
                                                 fmt.Println("Error adding files to Git:", err)
                                         } else {
                                                 //fmt.Printf("Added %d file(s) to Git\n", len(files))
@@ -985,7 +1059,7 @@ func main() {
                         //fmt.Println("test")
                         if git, err := git.PlainOpen(gitDirectory); err == nil {
                                 go func() {
-                                        if err := egit.AddFilesToGit(files, git); err != nil {
+                                        if err := egitMod.AddFilesToGit(files, git); err != nil {
                                                 fmt.Println("Error adding files to Git:", err)
                                         } else {
                                                 //fmt.Printf("Added %d file(s) to Git\n", len(files))

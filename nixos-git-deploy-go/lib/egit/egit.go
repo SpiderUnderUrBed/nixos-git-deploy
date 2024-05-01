@@ -8,9 +8,17 @@ import (
 	"nixos-git-deploy-go/lib/fc"
 	"github.com/go-git/go-git/v5"
 )
-var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
+type EgitMod struct {
+	gitDirectory string
+}
+func (e *EgitMod) Init(directory string) *EgitMod {
+	return &EgitMod{
+		gitDirectory: directory,
+		//AddFilesToGit: AddFilesToGit,
+	}
+}
 // Function to add files to Git repository
-func AddFilesToGit(files []string, r *git.Repository) error {
+func (e *EgitMod) AddFilesToGit(files []string, r *git.Repository) error {
 	// 	var gitDirectory = "/home/spiderunderurbed/.config/nixos-git-deploy/"
 	// // var watchedFiles = make(map[string]bool)
 	
@@ -30,7 +38,7 @@ func AddFilesToGit(files []string, r *git.Repository) error {
 			fileName := filepath.Base(file)
 	
 			// Destination path in the Git directory
-			destination := filepath.Join(gitDirectory, fileName)
+			destination := filepath.Join(e.gitDirectory, fileName)
 	
 			// Copy the file to the Git directory
 			if err := fc.CopyFile(file, destination); err != nil {
