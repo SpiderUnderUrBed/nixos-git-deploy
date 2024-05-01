@@ -35,7 +35,7 @@ import (
         "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 var usr, _ = user.Current()
-var gitDirectory = usr.HomeDir + ".config/nixos-git-deploy"
+var gitDirectory = usr.HomeDir + "/.config/nixos-git-deploy"
 // var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
 // var watchedFiles = make(map[string]bool)
 
@@ -586,7 +586,7 @@ func main() {
 			// dirPath := "/path/to/your/directory"
 			// indexing := []
 			// Open the directory
-			dir, err := os.Open(gitDirectory + ".ngdg/remote/dotfiles/")
+			dir, err := os.Open(gitDirectory + "/.ngdg/remote/dotfiles/")
 			if err != nil {
 				fmt.Println("Error opening directory:", err)
 				return
