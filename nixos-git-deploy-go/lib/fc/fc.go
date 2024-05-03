@@ -3,6 +3,7 @@ package fc
 import (
 	"strings"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"fmt"
 	"os"
@@ -10,6 +11,9 @@ import (
 	"bufio"
 
 	"path/filepath"
+
+	"nixos-git-deploy-go/lib/core"
+	
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	//"github.com/go-git/go-git/v5/config"

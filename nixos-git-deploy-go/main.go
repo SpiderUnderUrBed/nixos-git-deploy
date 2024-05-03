@@ -402,30 +402,6 @@ func Santitize(configFile Config){
 	}
 }
 
-<<<<<<< Updated upstream
-func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo) {
-	for j := 0; j < len(arr1)-1; j++ {
-		fileInfo := arr1[j].Name()
-                //PartialMergeTakeTwoListsFSName(arr2[j])
-		if fileInfo != ".git" {
-			if !core.ContainsFSName(arr2, fileInfo) {
-				fmt.Println("Added: " + fileInfo)
-			}
-		}
-        }
-	for j := 0; j < len(arr1)-1; j++ {
-		fileInfo := arr1[j].Name()
-                // PartialMergeTakeTwoListsFSName(arr1[j])
-		if fileInfo != ".git" {
-			if core.ContainsFSName(arr2, fileInfo) {
-				fmt.Println("Removed: " + fileInfo)
-			}
-		}
-	}
-}
-
-=======
->>>>>>> Stashed changes
 func main() {
 	//usr, err := user.Current()
 	//fmt.Println(usr.HomeDir)
@@ -675,20 +651,14 @@ func main() {
 				targetList = localList
 			}
 
-<<<<<<< Updated upstream
-			//fmt.Println(sourceList)
-			//fmt.Println("ended")
-			PartialMergeTakeTwoLists(sourceList, targetList)
-=======
-			gitDirList, err := gitDir.Readdir(-1)
-			if err != nil {
-				fmt.Println("Error reading directory contents:", err)
-				return
-			}
-			core.PartialMergeTakeTwoLists(gitDirList, remoteDirList)
+			// gitDirList, err := gitDir.Readdir(-1)
+			// if err != nil {
+			// 	fmt.Println("Error reading directory contents:", err)
+			// 	return
+			// }
+			core.PartialMergeTakeTwoLists(sourceList, targetList)
 
                         
->>>>>>> Stashed changes
                 case "list":
                         files, err := ioutil.ReadDir(gitDirectory)
                         if err != nil {

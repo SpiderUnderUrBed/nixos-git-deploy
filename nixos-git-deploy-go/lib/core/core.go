@@ -2,6 +2,7 @@ package core
 
 import (
 	"os"
+        "fmt"
 	"strings"
 	"io/fs"
 )
@@ -109,4 +110,20 @@ func Contains(array []string, target string) bool {
 }
 func Remove(slice []string, s int) []string {
     return append(slice[:s], slice[s+1:]...)
+}
+func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
+	for _, fileInfo := range arr1 {
+		if (fileInfo.Name() != ".git"){
+			if !ContainsFSName(arr2, fileInfo.Name()) {
+				fmt.Println("Added: " + fileInfo.Name())
+			}
+		}
+	}
+	for _, fileInfo := range arr2 {
+		if (fileInfo.Name() != ".git"){
+			if !ContainsFSName(arr1, fileInfo.Name()) {
+				fmt.Println("Removed: " + fileInfo.Name())
+			}
+		}
+	}
 }
