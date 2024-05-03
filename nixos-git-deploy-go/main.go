@@ -42,16 +42,17 @@ var egitMod egit.EgitMod
 // var watchedFiles = make(map[string]bool)
 
 type Config struct {
-    UserAllowed    string   `json:"UserAllowed"`
-    FirstTime      string   `json:"FirstTime"`
-    FilesToWatch   []string `json:"FilesToWatch"`
-    EncryptedFiles []string `json:"EncryptedFiles"`
-    TrackedFiles   []string `json:"TrackedFiles"`
-    URL   string `json:"URL"`
-    Name   string `json:"Name"`
-    Destination   string `json:"Destination"`
-}
-
+        UserAllowed    string   `json:"UserAllowed"`
+        FirstTime      string   `json:"FirstTime"`
+        FilesToWatch   []string `json:"FilesToWatch"`
+        EncryptedFiles []string `json:"EncryptedFiles"`
+        TrackedFiles   []string `json:"TrackedFiles"`
+        IgnoreFiles    []string `json:"IgnoreFiles"`
+        URL   string `json:"URL"`
+        Name   string `json:"Name"`
+        Destination   string `json:"Destination"`
+    }
+var configFile Config
 
 // type Settings struct {
 //      UserAllowed: "n",
@@ -100,7 +101,7 @@ func processParentArgs(args []string, messages chan string) {
         //messages <- "test"
 }
 
-func Reader(pipeFile string, origin string, messages chan string, settings Config) {
+func Reader(pipeFile string, origin string, messages chan string, configFile Config) {
         for {
                 // Open the named pipe for reading
                 pipe, err := os.Open(pipeFile)
@@ -142,7 +143,7 @@ func Reader(pipeFile string, origin string, messages chan string, settings Confi
         }
 }
 
-func writer(pipeFile string, origin string, messages chan string, settings Config) *os.File {
+func writer(pipeFile string, origin string, messages chan string, configFile Config) *os.File {
         // Open the file
         f, err := os.OpenFile(pipeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
         if err != nil {
@@ -170,104 +171,71 @@ func runChildProcess() {
 
         unix.Setpgid(0, 0)
 
-        //fmt.Println("STARTED CHILD PROCESS")
-
-        configFile := Config{
-                UserAllowed: "y",
-                FirstTime:   "y",
-                FilesToWatch: nil,
-                TrackedFiles: nil,
-                EncryptedFiles: nil,
-		URL: "",
-		Name: "",
-        }
-
-        rawConfig, err := os.Open("./config.json")
-        if err != nil {
-                fmt.Println("Error opening file:", err)
-                return
-        }
-        defer rawConfig.Close()
-
-        formattedConfig, err := ioutil.ReadAll(rawConfig)
-        if err != nil {
-                fmt.Println("Error reading file:", err)
-                return
-        }
-
-        err = json.Unmarshal(formattedConfig, &configFile)
-        if err != nil {
-                fmt.Println("Error unmarshalling JSON:", err)
-                return
-        }
-
-        // Reset file cursor to beginning
-        _, err = rawConfig.Seek(0, 0)
-        if err != nil {
-                fmt.Println("Error seeking file:", err)
-                return
-        }
-
-        fomated_config, err := ioutil.ReadAll(rawConfig)
-        if err != nil {
-                fmt.Println("Error reading file:", err)
-                return
-        }
-
-        var settings Config
-        err = json.Unmarshal(fomated_config, &settings)
-        if err != nil {
-                fmt.Println("Error unmarshalling JSON:", err)
-                return
-        }
-        //fmt.Println("survived here")
-        //fmt.Println(len(settings.FilesToWatch))
-        for i := 0; i < len(settings.FilesToWatch); i++ {
+        for i := 0; i < len(configFile.FilesToWatch); i++ {
                 // Check if the file exists
-                if _, err := os.Stat(settings.FilesToWatch[i]); os.IsNotExist(err) {
-                        //fmt.Printf("File %s does not exist. Removing from settings.\n", settings.FilesToWatch[i])
-                        // Remove the file from settings
-                        settings.FilesToWatch = append(settings.FilesToWatch[:i], settings.FilesToWatch[i+1:]...)
+                if _, err := os.Stat(configFile.FilesToWatch[i]); os.IsNotExist(err) {
+                        //fmt.Printf("File %s does not exist. Removing from configFile.\n", configFile.FilesToWatch[i])
+                        // Remove the file from configFile
+                        configFile.FilesToWatch = append(configFile.FilesToWatch[:i], configFile.FilesToWatch[i+1:]...)
                         //continue // Skip to the next iteration
                 }
 
                 // Start watching the file in a goroutine
-                go fc.WatchChanges(settings.FilesToWatch[i])
+                go fc.WatchChanges(configFile.FilesToWatch[i])
         }
-        //fmt.Println(settings.FilesToWatch)
-        jsonData, err := json.Marshal(settings)
-        //fmt.Println(jsonData)
-        if err != nil {
-                fmt.Println("Error with JSON:", err)
-        }
+        //fmt.Println(configFile.FilesToWatch)
+        // jsonData, err := json.Marshal(configFile)
+        // //fmt.Println(jsonData)
+        // if err != nil {
+        //         fmt.Println("Error with JSON:", err)
+        // }
 
-        err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
-        if err != nil {
-                fmt.Println("Error with file:", err)
-        }
-
+        WriteConfig(configFile)
         messages := make(chan string, 10000)
-        go Reader("recede.log", "child", messages, settings)
-        go writer("detach.log", "child", messages, settings)
+        go Reader("recede.log", "child", messages, configFile)
+        go writer("detach.log", "child", messages, configFile)
 
         c := make(chan os.Signal, 1)
         signal.Notify(c, os.Interrupt, syscall.SIGTERM)
         <-c
         fmt.Println("Exited")
 }
-func WriteConfig(configFile Config){
-	jsonData, err := json.Marshal(configFile)
-	//fmt.Println(jsonData)
-	if err != nil {
-		fmt.Println("Error with JSON:", err)
-	}
+func WriteConfig(configFile Config) error {
 
-	err = ioutil.WriteFile("./config.json", []byte(jsonData), 0644)
-	if err != nil {
-		fmt.Println(err)
-	}
-	// fc.ModifyFile(file)
-}
+        rawConfig, err := os.Open("./config.json")
+        if err != nil {
+                fmt.Println("Error opening file:", err)
+                //return
+        }
+        defer rawConfig.Close()
+
+        formattedConfig, err := ioutil.ReadAll(rawConfig)
+        if err != nil {
+                fmt.Println("Error reading file:", err)
+                //return
+        }
+
+        err = json.Unmarshal(formattedConfig, &configFile)
+        if err != nil {
+                fmt.Println("Error unmarshalling JSON:", err)
+                //return 
+        }
+       // fmt.Println(configFile)
+        jsonStr, err := json.MarshalIndent(configFile, "", "    ")
+        if err != nil {
+            fmt.Println("Error marshalling JSON:", err)
+            return err // Return the error
+        }
+    
+        err = ioutil.WriteFile("./config.json", []byte(jsonStr), 0644)
+        if err != nil {
+            fmt.Println(err)
+            return err // Return the error
+        }
+    
+        return nil // No error occurred
+    }
+    
 func Cleanup(messages chan string){
 	        // Close the messages channel to stop writer goroutine
         close(messages)
@@ -311,7 +279,7 @@ func killProcess(pid int) error {
 }
 
 func Santitize(configFile Config){
-        // for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
+        // for _, path := range append(configFile.TrackedFiles, configFile.FilesToWatch...) {
         // 	fileName := filepath.Base(path)
         // 	TrackedFiles = append(TrackedFiles, fileName)
         // }
@@ -403,8 +371,18 @@ func Santitize(configFile Config){
 }
 
 func main() {
-	//usr, err := user.Current()
-	//fmt.Println(usr.HomeDir)
+        //_, err = rawConfig.Seek(0, 0)
+        configFile = Config{
+                UserAllowed:  "y",
+                FirstTime:    "y",
+                FilesToWatch: nil,
+                EncryptedFiles: nil, 
+                TrackedFiles: nil,
+                IgnoreFiles: nil,
+                URL: "",
+                Name: "",
+                Destination: "",
+        }
                 //Santitize(configFile)
         //Check if there are any command-line arguments
         if len(os.Args) > 1 && os.Args[1] == "child" {
@@ -412,23 +390,9 @@ func main() {
                 runChildProcess()
                 return
         }
-
+     
         reader := bufio.NewReader(os.Stdin)
-
-	egitMod := egitMod.Init(gitDirectory)
-	// egitMod.AddFilesToGit()
-	// fmt.Println(egitMod)
-
-        configFile := Config{
-                UserAllowed:  "y",
-                FirstTime:    "y",
-                FilesToWatch: nil,
-                EncryptedFiles: nil, 
-                TrackedFiles: nil,
-		URL: "",
-		Name: "",
-		Destination: "",
-        }
+         
 
         rawConfig, err := os.Open("./config.json")
         if err != nil {
@@ -448,30 +412,33 @@ func main() {
                 fmt.Println("Error unmarshalling JSON:", err)
                 return
         }
-
-        // Reset file cursor to beginning
-        _, err = rawConfig.Seek(0, 0)
-        if err != nil {
-                fmt.Println("Error seeking file:", err)
+        // configFile.IgnoreFiles = []string{}
+        if configFile.UserAllowed == "" {
+                configFile.UserAllowed = "y"
+        }
+        if configFile.FirstTime == "" {
+                configFile.FirstTime = "y"
+        }
+        if configFile.FilesToWatch == nil {
+                configFile.FilesToWatch = []string{}
+        }
+        if configFile.EncryptedFiles == nil {
+                configFile.EncryptedFiles = []string{}
+        }
+        if configFile.TrackedFiles == nil {
+                configFile.TrackedFiles = []string{}
+        }
+        if configFile.IgnoreFiles == nil {
+                configFile.IgnoreFiles = []string{}
+        }
+        if err := WriteConfig(configFile); err != nil {
+                fmt.Println("Error writing config:", err)
                 return
         }
-
-        fomated_config, err := ioutil.ReadAll(rawConfig)
-        if err != nil {
-                fmt.Println("Error reading file:", err)
-                return
-        }
-
-        var settings Config
-        err = json.Unmarshal(fomated_config, &settings)
-        if err != nil {
-                fmt.Println("Error unmarshalling JSON:", err)
-                return
-        }
-
-        //fmt.Println(settings)
-        //fmt.Print(settings)
-        if settings.FirstTime == "y" {
+        
+        //fmt.Println(configFile)
+        //fmt.Print(configFile)
+        if configFile.FirstTime == "y" {
                 //      print("user not allowed")
 	configFile.FirstTime = "n"
 	fmt.Print("Hello! This is nixos-git-deploy.\n Here are all the commands \n POST: it will update all your files which you are tracking \n WATCH: It will look for any file changes even after script death and update your files \n CLEAN: clean any files that arnt being tracked or watched \n status, shows you the git status of the repo and files that are being tracked and watched (not by git) \n apply: will apply all your changes to your repo starting with a pull request sent to catch errors early, then you enter details for the commit, then it pushes \n remote-init: will add a remote \n age: will add age encryption to your file you want to push to your remotes. \n destination: changes the default git repo destination \n init: initilizes the repo \n upgrade, pulls your changes \n quit: self explanitory \n full-merge: 3 way merge between the remote, your target and source \n partial-merge: if a file is removed in your local configuration/destination/remote or added it will update that in your repo/destination/local configuration \n")
@@ -542,8 +509,8 @@ func main() {
                 messages <- "new " + strconv.Itoa(cmd.Process.Pid)
         }()
 
-        go writer("recede.log", "parent", messages, settings)
-        go Reader("detach.log", "parent", messages, settings)
+        go writer("recede.log", "parent", messages, configFile)
+        go Reader("detach.log", "parent", messages, configFile)
 
         messages <- "new " + strconv.Itoa(cmd.Process.Pid)
 
@@ -954,8 +921,8 @@ func main() {
 			Santitize(configFile)
                 case "clean":
                         var TrackedFiles []string
-                        //TrackedFiles = append(settings.FilesToWatch)
-                        for _, path := range append(settings.TrackedFiles, settings.FilesToWatch...) {
+                        //TrackedFiles = append(configFile.FilesToWatch)
+                        for _, path := range append(configFile.TrackedFiles, configFile.FilesToWatch...) {
                                 fileName := filepath.Base(path)
                                 TrackedFiles = append(TrackedFiles, fileName)
                         }

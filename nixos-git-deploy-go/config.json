@@ -1,1 +1,21 @@
-{"UserAllowed":"y","FirstTime":"n","FilesToWatch":["/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt.encrypted","/home/spiderunderurbed/projects/nixos-git-deploy-go/test4.txt"],"EncryptedFiles":["/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt","/home/spiderunderurbed/projects/nixos-git-deploy-go/test2.txt","/home/spiderunderurbed/projects/nixos-git-deploy-go/test3.txt"],"TrackedFiles":["/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt.encrypted","/home/spiderunderurbed/projects/nixos-git-deploy-go/test2.txt.encrypted"],"URL":"https://github.com/SpiderUnderUrBed/nixos-git-deploy.git","Name":"dotfiles"}
+{
+    "UserAllowed": "y",
+    "FirstTime": "n",
+    "FilesToWatch": [
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt.encrypted",
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test4.txt"
+    ],
+    "EncryptedFiles": [
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt",
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test2.txt",
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test3.txt"
+    ],
+    "TrackedFiles": [
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test.txt.encrypted",
+        "/home/spiderunderurbed/projects/nixos-git-deploy-go/test2.txt.encrypted"
+    ],
+    "IgnoreFiles": [],
+    "URL": "https://github.com/SpiderUnderUrBed/nixos-git-deploy.git",
+    "Name": "dotfiles",
+    "Destination": ""
+}
