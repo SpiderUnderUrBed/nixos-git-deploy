@@ -3,6 +3,7 @@ module nixos-git-deploy-go
 go 1.22.1
 
 require (
+	
 	github.com/go-git/go-git/v5 v5.12.0
 	golang.org/x/crypto v0.21.0
 )

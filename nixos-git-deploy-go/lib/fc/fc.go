@@ -148,22 +148,29 @@ func CopyFile(src, dest string) error {
 	
 	return nil
 }
-func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
-	for _, fileInfo := range arr1 {
-		if (fileInfo.Name() != ".git"){
-			if !core.ContainsFSName(arr2, fileInfo.Name()) {
-				fmt.Println("Added: " + fileInfo.Name())
-			}
-		}
-	}
-	for _, fileInfo := range arr2 {
-		if (fileInfo.Name() != ".git"){
-			if !core.ContainsFSName(arr1, fileInfo.Name()) {
-				fmt.Println("Removed: " + fileInfo.Name())
-			}
-		}
-	}
+type FileInfoExtra struct {
+	FileInfo   fs.FileInfo
+	Dir  string
 }
+
+ func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
+ 	for _, fileInfo := range arr1 {
+ 		if (fileInfo.Name() != ".git"){
+ 			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
+ 			if !isMatched {
+ 				fmt.Println("Added: " + fileInfo.Name())
+ 			}
+ 		}
+ 	}
+ 	for _, fileInfo := range arr2 {
+ 		if (fileInfo.Name() != ".git"){
+ 			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
+ 			if !isMatched {
+ 				fmt.Println("Removed: " + fileInfo.Name())
+ 			}
+ 		}
+ 	}
+ }
 func FileEnsureStrings(file string, contentList []string) any {
 	for _, e := range contentList {
 		content := e
