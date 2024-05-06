@@ -2,7 +2,7 @@ package core
 
 import (
 	"os"
-     //   "fmt"
+  //  "fmt"
         //"fs"
   //      "nixos-git-deploy-go"
 	"strings"
@@ -111,46 +111,52 @@ func FileExists(fileName string) bool {
 //}
 //func ContainsFSName[FS fs.FileInfo | FileInfoExtra](slice []FS, item string) (any, bool) {
 //func ContainsFSName[FS FileInfo](slice []FS, item string) (any, bool) { 
-type FileInfo interface {
-    Name() string
-    // Dir() *string
-}
-type FileInfoExtra[FS FileInfo] struct {
-    FileInfo FS;
-    Dir string
-}
-
-func (f FileInfoExtra[FS]) Name() string {
-   return f.FileInfo.Name()
-}
-
-func ContainsFSName[FS FileInfo](slice []FS, item string) ( FileInfoExtra[FS], bool) {
-    for _, s := range slice {
-        if s.Name() == item {
-            // Check if FS type has Dir() method
-            if dirFunc, ok := interface{}(s).(interface{ Dir() string }); ok {
-                return FileInfoExtra[FS]{FileInfo: s, Dir: dirFunc.Dir()}, true
-            }
-            // If FS type doesn't have Dir() method, return FileInfo without Dir
-            return FileInfoExtra[FS]{FileInfo: s}, true
-        }
+    type FileInfo interface {
+        Name() string
+        Dir() *string
     }
-        // If the file is not found in the slice, create FileInfo from os.Stat
-        file, err := os.Stat(item)
-        if err != nil {
-            // If there was an error, return false indicating file not found
-            return FileInfoExtra[FS]{}, false
+    
+    type FileInfoExtra[FS FileInfo] struct {
+        FileInfo FS
+        Dir      string
+    }
+    
+    func (f FileInfoExtra[FS]) Name() string {
+        return f.FileInfo.Name()
+    }
+    
+    func ContainsFSName[FS FileInfo](slice []FS, item string) (FileInfoExtra[FS], bool) {
+        for _, s := range slice {
+            if s.Name() == item {
+                return FileInfoExtra[FS]{FileInfo: s, Dir: *s.Dir()}, true
+            }
         }
-        // Check if os.FileInfo satisfies the FileInfo interface
-        var fileInfo FileInfo = file
-        // Perform type assertion to ensure compatibility with FS
-        fileInfoFS, ok := fileInfo.(FS)
-        if !ok {
-            // If fileInfo doesn't satisfy FS, return false
-            return FileInfoExtra[FS]{}, false
-        }
-        return FileInfoExtra[FS]{FileInfo: fileInfoFS}, true
-}
+        return FileInfoExtra[FS]{}, false
+    }
+    
+
+        // // If the file is not found in the slice, create FileInfo from os.Stat
+        // file, err := os.Stat(item)
+        // if err != nil {
+        //     // If there was an error, return false indicating file not found
+        //     return FileInfoExtra[FS]{}, false
+        // }
+        // // Check if os.FileInfo satisfies the FileInfo interface
+        // var fileInfo FileInfo = file
+        // // Perform type assertion to ensure compatibility with FS
+        // fileInfoFS, ok := fileInfo.(FS)
+        // if !ok {
+        //     // If fileInfo doesn't satisfy FS, return false
+        //     return FileInfoExtra[FS]{}, false
+        // }
+        // return FileInfoExtra[FS]{FileInfo: fileInfoFS}, true
+            // Check if FS type has Dir() method
+            // fmt.Println(s)
+            // if dirFunc, ok := interface{}(s).(interface{ Dir() string }); ok {
+            //     fmt.Print("Dir")
+            //     return FileInfoExtra[FS]{FileInfo: s, Dir: dirFunc.Dir()}, true
+            // }
+            // If FS type doesn't have Dir() method, return FileInfo without Dir
 func Contains(array []string, target string) bool {
         for _, item := range array {
                 if item == target {

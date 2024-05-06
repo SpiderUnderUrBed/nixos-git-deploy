@@ -40,15 +40,20 @@ var gitDirectory = usr.HomeDir + "/.config/nixos-git-deploy"
 var egitMod egit.EgitMod
 // var mainDir = "/home/spiderunderurbed/projects/nixos-git-deploy-go/"
 // var watchedFiles = make(map[string]bool)
-type FileInfoExtra struct {
-        FileInfo   fs.FileInfo
-        Dir  string
-        //Name string
+type FileInfo interface {
+        Name() string
+        Dir() *string
 }
-func (f FileInfoExtra) Name() string {
-	return f.FileInfo.Name()
+    
+type FileInfoExtra[FS FileInfo] struct {
+        FileInfo FS
+        Dir      string
 }
 
+func (f FileInfoExtra[FS]) Name() string {
+        return f.FileInfo.Name()
+}
+    
     
 type Config struct {
         UserAllowed    string   `json:"UserAllowed"`
@@ -567,7 +572,7 @@ func main() {
 				main()
 			}
 
-			var remoteDirList []FileInfoExtra
+			var remoteDirList []FileInfoExtra[FileInfo]
 			if (source == "r" || target == "r"){
 			dir, err := os.Open(gitDirectory + "/.ngdg/remote/dotfiles/")
 			if err != nil {
@@ -580,14 +585,14 @@ func main() {
 				return
 			}
                         for _, file := range PreRemoteDirList {
-                                extFsType := FileInfoExtra{
+                                extFsType := FileInfoExtra[FileInfo]{
                                         FileInfo: file,
                                         Dir: file.Name(),
                                 }
                                 remoteDirList = append(remoteDirList, extFsType)
                         }
 			}
-			var gitDirList []FileInfoExtra
+			var gitDirList []FileInfoExtra[FileInfo]
 			if (source == "t" || target == "t"){
 				gitDir, err := os.Open(gitDirectory)
 				if err != nil {
@@ -600,7 +605,7 @@ func main() {
 					return
 				}
                                 for _, file := range PreGitDirList {
-                                        extFsType := FileInfoExtra{
+                                        extFsType := FileInfoExtra[FileInfo]{
                                                 FileInfo: file,
                                                 Dir: file.Name(),
                                         }
@@ -609,14 +614,14 @@ func main() {
 			}
 
 			// Read the contents of the directory
-			var localList []FileInfoExtra
+			var localList []FileInfoExtra[FileInfo]
 			if (source == "l" || target == "l"){
 				for _, file := range append(configFile.FilesToWatch, configFile.TrackedFiles...) {
                                         if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
                                         continue;
                                         }
 					localFilePre, _ := os.Stat(file) 
-                                        localFile := FileInfoExtra{
+                                        localFile := FileInfoExtra[FileInfo]{
                                                 FileInfo: localFilePre,
                                                 Dir: file,
                                         }
@@ -624,8 +629,8 @@ func main() {
 					localList = append(localList, localFile)
 				}
 			}
-			var sourceList []FileInfoExtra
-			var targetList []FileInfoExtra
+			var sourceList []FileInfoExtra[FileInfo]
+			var targetList []FileInfoExtra[FileInfo]
 			if (source == "r"){
 				sourceList = remoteDirList
 			} 
@@ -649,7 +654,7 @@ func main() {
                                 if (PrefileInfo.FileInfo.Name() != ".git"){
                                         matchedFile, isMatched := core.ContainsFSName(targetList, PrefileInfo.FileInfo.Name())
                                         //fmt.Println(filepath.Dir(fileInfo.Name()))
-                                        fmt.Println(matchedFile.Dir)
+                                        fmt.Println(matchedFile)
                                         if !isMatched {
                                                 fmt.Println("Added: " + PrefileInfo.FileInfo.Name())
                                               //  CopyFile()
@@ -658,9 +663,9 @@ func main() {
                         }
                         for _, PrefileInfo := range targetList {
                                 if (PrefileInfo.FileInfo.Name() != ".git"){
-                                        matchedFile, isMatched := core.ContainsFSName(targetList, PrefileInfo.FileInfo.Name())
+                                        matchedFile, isMatched := core.ContainsFSName(sourceList, PrefileInfo.FileInfo.Name())
                                         //fmt.Println(filepath.Dir(fileInfo.Name()))
-                                        fmt.Println(matchedFile.Dir)
+                                        fmt.Println(matchedFile)
                                         if !isMatched {
                                                 fmt.Println("Removed: " + PrefileInfo.FileInfo.Name())
                                         }

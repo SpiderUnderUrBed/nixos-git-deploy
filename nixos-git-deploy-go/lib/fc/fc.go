@@ -12,7 +12,7 @@ import (
 
 	"path/filepath"
 
-	"nixos-git-deploy-go/lib/core"
+	//"nixos-git-deploy-go/lib/core"
 	
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
@@ -153,24 +153,24 @@ type FileInfoExtra struct {
 	Dir  string
 }
 
- func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
- 	for _, fileInfo := range arr1 {
- 		if (fileInfo.Name() != ".git"){
- 			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
- 			if !isMatched {
- 				fmt.Println("Added: " + fileInfo.Name())
- 			}
- 		}
- 	}
- 	for _, fileInfo := range arr2 {
- 		if (fileInfo.Name() != ".git"){
- 			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
- 			if !isMatched {
- 				fmt.Println("Removed: " + fileInfo.Name())
- 			}
- 		}
- 	}
- }
+//  func PartialMergeTakeTwoLists(arr1 []fs.FileInfo, arr2 []fs.FileInfo){
+//  	for _, fileInfo := range arr1 {
+//  		if (fileInfo.Name() != ".git"){
+//  			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
+//  			if !isMatched {
+//  				fmt.Println("Added: " + fileInfo.Name())
+//  			}
+//  		}
+//  	}
+//  	for _, fileInfo := range arr2 {
+//  		if (fileInfo.Name() != ".git"){
+//  			_, isMatched := core.ContainsFSName(arr2, fileInfo.Name())
+//  			if !isMatched {
+//  				fmt.Println("Removed: " + fileInfo.Name())
+//  			}
+//  		}
+//  	}
+//  }
 func FileEnsureStrings(file string, contentList []string) any {
 	for _, e := range contentList {
 		content := e
